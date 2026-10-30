@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word Chain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E6EFEA; --surface:#F7FBF8; --ink:#16233F; --muted:#56657F;
+  --tile:#F2C14E; --tile-ink:#16233F; --link:#2D5BFF; --line:#C5D3CB; --bad:#C2185B; --good:#1E7F4F;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1626; --surface:#18223A; --ink:#E8EEF8; --muted:#9AA8C2;
+    --tile:#F2C14E; --tile-ink:#16233F; --link:#7D9BFF; --line:#2A3755; --bad:#FF6B9A; --good:#5FD39A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1626; --surface:#18223A; --ink:#E8EEF8; --muted:#9AA8C2;
+  --tile:#F2C14E; --tile-ink:#16233F; --link:#7D9BFF; --line:#2A3755; --bad:#FF6B9A; --good:#5FD39A;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17px;line-height:1.45}
+main{max-width:720px;margin:0 auto;padding:20px 18px 48px}
+h1{font-size:clamp(2.2rem,8vw,3.4rem);line-height:1;font-weight:800;letter-spacing:-.02em;margin:8px 0 6px}
+h2{font-size:1.25rem;margin:28px 0 10px;font-weight:600}
+p{margin:0 0 10px}
+.muted{color:var(--muted)}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:2px solid var(--ink);background:var(--surface);border-radius:10px;padding:10px 16px;font-weight:600}
+button.primary{background:var(--ink);color:var(--paper)}
+button.ghost{border-color:var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--link);outline-offset:2px}
+input{border:2px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;width:100%}
+a{color:var(--link)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.list{list-style:none;padding:0;margin:0}
+.list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.code{font-weight:800;letter-spacing:.06em}
+/* the chain: hero element */
+.chain{display:flex;flex-wrap:wrap;gap:6px 0;align-items:center;margin:18px 0;min-height:56px}
+.word{display:inline-flex;align-items:center}
+.word .t{display:inline-grid;place-items:center;width:30px;height:38px;background:var(--surface);border:2px solid var(--ink);border-left-width:0;font-weight:800;font-size:1.05rem;text-transform:uppercase}
+.word .t:first-child{border-left-width:2px;border-radius:8px 0 0 8px}
+.word .t:last-child{border-radius:0 8px 8px 0}
+.word .t.join{background:var(--tile);color:var(--tile-ink)}
+.word.struck .t{opacity:.35;text-decoration:line-through}
+.word .by{font-size:.75rem;color:var(--muted);margin:0 10px 0 6px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.word.latest .t{animation:pop .35s ease-out}
+@keyframes pop{from{transform:translateY(-6px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.word.latest .t{animation:none}}
+.next{display:inline-grid;place-items:center;width:38px;height:46px;border:2px dashed var(--link);border-radius:8px;font-weight:800;font-size:1.3rem;color:var(--link);text-transform:uppercase}
+.players{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.p{padding:8px 12px;border:2px solid var(--line);border-radius:999px;font-size:.95rem;background:var(--surface)}
+.p.turn{border-color:var(--link);box-shadow:0 0 0 2px var(--link) inset}
+.p.out{opacity:.5;text-decoration:line-through}
+.p b{margin-left:6px}
+.play{display:flex;gap:8px;align-items:stretch}
+.play .lead{display:grid;place-items:center;min-width:46px;background:var(--tile);color:var(--tile-ink);border-radius:10px;font-weight:800;font-size:1.3rem;text-transform:uppercase}
+.msg{min-height:1.4em;margin:8px 0;font-size:.95rem}
+.msg.bad{color:var(--bad)} .msg.good{color:var(--good)}
+.panel{background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:16px;margin:16px 0}
+.hits{list-style:none;margin:8px 0 0;padding:0}
+.hits li{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
+.stats{display:flex;gap:22px;flex-wrap:wrap}
+.stats div b{display:block;font-size:1.5rem}
+.banner{background:var(--tile);color:var(--tile-ink);border-radius:14px;padding:16px;font-weight:600;margin:12px 0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.back{border:none;background:none;padding:6px 0;color:var(--link)}
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Loading…</p></main>
+<script>
+(function(){
+const app=document.getElementById('app');
+let db=null,user=null,me=null,names={},gameUnsub=null,lobbyUnsubs=[],currentGame=null,myStats=null,flash={text:'',kind:''};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nm=id=>id===me?'You':(names[id]||'Someone');
+const newCode=()=>{const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';for(let i=0;i<6;i++)s+=a[Math.floor(Math.random()*a.length)];return s};
+const routeCode=()=>{const h=location.hash.slice(1);return /^g-[a-z0-9]{6}$/.test(h)?h.slice(2):null};
+
+async function resolveNames(ids){
+  const need=[...new Set(ids)].filter(i=>i&&!(i in names));
+  if(!need.length||!user)return;
+  try{const ps=await user.profiles(need);for(const i of need)names[i]=(ps[i]&&ps[i].name)||'';}catch(e){}
+}
+
+/* ---------- personal memory ---------- */
+function statsRef(){return db.doc('data/users/'+me+'/profile')}
+async function saveStats(patch){
+  try{
+    const cur=myStats||{played:0,words:0,longest:'',recent:[]};
+    const next=Object.assign({},cur,patch);
+    myStats=next;
+    await statsRef().set(next);
+  }catch(e){}
+}
+async function rememberGame(code){
+  const cur=myStats||{played:0,words:0,longest:'',recent:[]};
+  const recent=(cur.recent||[]).filter(c=>c!==code);
+  const isNew=recent.length===(cur.recent||[]).length;
+  recent.unshift(code);
+  await saveStats({recent:recent.slice(0,12),played:(cur.played||0)+(isNew?1:0)});
+}
+
+/* ---------- lobby ---------- */
+async function renderLobby(){
+  stopGame();
+  app.innerHTML=`
+  <h1>Word chain</h1>
+  <p class="muted">Each word starts with the last letter of the one before. No repeats. Longer words score more.</p>
+  <div class="row" style="margin-top:16px"><button class="primary" id="create">Start a new game</button></div>
+  <div class="row" style="margin-top:12px">
+    <input id="joinCode" placeholder="Have a code? Type it here" maxlength="6" style="flex:1;min-width:180px" autocapitalize="off">
+    <button id="joinBtn">Join</button>
+  </div>
+  <p class="msg" id="lmsg"></p>
+  <div id="invites"></div>
+  <h2>Your games</h2><ul class="list" id="mine"><li class="muted">Loading…</li></ul>
+  <h2>Your record</h2><div class="stats" id="stats"></div>`;
+  document.getElementById('create').onclick=createGame;
+  const join=()=>{const c=document.getElementById('joinCode').value.trim().toLowerCase();if(/^[a-z0-9]{6}$/.test(c))location.hash='g-'+c;else{document.getElementById('lmsg').textContent='Game codes are 6 letters or numbers.';document.getElementById('lmsg').className='msg bad'}};
+  document.getElementById('joinBtn').onclick=join;
+  document.getElementById('joinCode').onkeydown=e=>{if(e.key==='Enter')join()};
+  drawStats();
+  const games=db.collection('games');
+  lobbyUnsubs.push(games.where('players','array-contains',me).onSnapshot(async s=>{
+    const docs=s.docs.map(d=>d.data()).sort((a,b)=>(b.updated||0)-(a.updated||0));
+    await resolveNames(docs.flatMap(g=>g.players||[]));
+    const el=document.getElementById('mine');if(!el)return;
+    el.innerHTML=docs.length?docs.map(g=>`<li><span><span class="code">${esc(g.code.toUpperCase())}</span> <span class="muted">· ${statusText(g)}</span><br><small class="muted">${esc((g.players||[]).map(nm).join(', '))}</small></span><a href="#g-${esc(g.code)}">Open</a></li>`).join(''):'<li class="muted">No games yet. Start one and send the link to a friend.</li>';
+  },()=>{}));
+  lobbyUnsubs.push(games.where('invited','array-contains',me).onSnapshot(async s=>{
+    const docs=s.docs.map(d=>d.data()).filter(g=>!(g.players||[]).includes(me)&&g.status!=='over');
+    await resolveNames(docs.map(g=>g.host));
+    const el=document.getElementById('invites');if(!el)return;
+    el.innerHTML=docs.length?`<h2>Invites for you</h2><ul class="list">${docs.map(g=>`<li><span>${esc(nm(g.host))} invited you to <span class="code">${esc(g.code.toUpperCase())}</span></span><a href="#g-${esc(g.code)}">Join</a></li>`).join('')}</ul>`:'';
+  },()=>{}));
+}
+function statusText(g){return g.status==='lobby'?'waiting to start':g.status==='playing'?(g.words||[]).length+' words so far':'finished'}
+function drawStats(){
+  const el=document.getElementById('stats');if(!el)return;
+  const s=myStats||{};
+  el.innerHTML=`<div><b>${s.played||0}</b><span class="muted">games joined</span></div><div><b>${s.words||0}</b><span class="muted">words played</span></div><div><b>${esc(s.longest?s.longest.toUpperCase():'—')}</b><span class="muted">longest word</span></div>`;
+}
+async function createGame(){
+  const code=newCode();
+  const g={code,host:me,players:[me],invited:[],status:'lobby',words:[],turn:0,scores:{[me]:0},strikes:{[me]:0},created:Date.now(),updated:Date.now()};
+  try{await db.doc('games/'+code).set(g);await rememberGame(code);location.hash='g-'+code;}
+  catch(e){const m=document.getElementById('lmsg');m.textContent=e&&e.code==='quota_exceeded'?'This app has reached its game limit. Ask the owner to clear old games.':'Couldn’t create the game. Check that you have Contributor access to this page.';m.className='msg bad';}
+}
+
+/* ---------- game ---------- */
+function stopGame(){if(gameUnsub){gameUnsub();gameUnsub=null}lobbyUnsubs.forEach(u=>u());lobbyUnsubs=[];currentGame=null}
+function openGame(code){
+  stopGame();
+  app.innerHTML='<p class="muted">Opening game…</p>';
+  let first=true;
+  gameUnsub=db.doc('games/'+code).onSnapshot(async snap=>{
+    if(!snap.exists){app.innerHTML=`<button class="back" onclick="location.hash=''">‹ All games</button><h1>No game here</h1><p>There’s no game with the code <b>${esc(code.toUpperCase())}</b>. Check the link or start a new game.</p>`;return}
+    const g=snap.data();
+    if(first){first=false;if(!g.players.includes(me)&&g.status!=='over'){await joinGame(code);return}if(g.players.includes(me))rememberGame(code)}
+    await resolveNames([...(g.players||[]),...(g.invited||[]),...(g.words||[]).map(w=>w.by)]);
+    const prevLen=currentGame?(currentGame.words||[]).length:-1;
+    currentGame=g;drawGame(g,prevLen);
+  },()=>{app.innerHTML='<p>This game couldn’t be loaded. Reload the page to try again.</p>'});
+}
+async function joinGame(code){
+  const ref=db.doc('games/'+code);
+  try{
+    const s=await ref.get();const g=s.data();if(!g||g.players.includes(me))return;
+    await ref.update({players:[...g.players,me],scores:Object.assign({},g.scores,{[me]:0}),strikes:Object.assign({},g.strikes,{[me]:0}),updated:Date.now()});
+    await rememberGame(code);
+  }catch(e){flash={text:'You can watch this game, but joining needs Contributor access to this page.',kind:'bad'};if(currentGame)drawGame(currentGame,-1)}
+}
+const active=g=>g.players.filter(p=>(g.strikes[p]||0)<3);
+const lastLetter=g=>{const live=(g.words||[]).filter(w=>!w.struck);return live.length?live[live.length-1].w.slice(-1):null};
+function turnPlayer(g){const a=active(g);return a.length?a[g.turn%a.length]:null}
+
+function drawGame(g,prevLen){
+  const focusInput=document.activeElement&&document.activeElement.id==='word';
+  const draft=focusInput?document.activeElement.value:'';
+  const isPlayer=g.players.includes(me),isHost=g.host===me,tp=turnPlayer(g),myTurn=g.status==='playing'&&tp===me;
+  const need=lastLetter(g);
+  const words=g.words||[];
+  const link=location.href.split('#')[0]+'#g-'+g.code;
+  const chain=words.map((w,i)=>{
+    const letters=w.w.split('').map((c,j)=>`<span class="t${(j===0&&i>0)||j===w.w.length-1?' join':''}">${esc(c)}</span>`).join('');
+    return `<span class="word${w.struck?' struck':''}${i===words.length-1&&prevLen>=0&&words.length>prevLen?' latest':''}">${letters}<span class="by">${esc(nm(w.by))}</span></span>`;
+  }).join('')+(g.status==='playing'?`<span class="next" aria-label="Next word starts with ${need||'any letter'}">${need?esc(need):'?'}</span>`:'');
+  const lastLive=[...words].reverse().find(w=>!w.struck);
+  const players=g.players.map(p=>`<span class="p${p===tp&&g.status==='playing'?' turn':''}${(g.strikes[p]||0)>=3?' out':''}">${esc(nm(p))}${p===g.host?' (host)':''}<b>${g.scores[p]||0}</b>${g.strikes[p]?` <small class="muted">${'✕'.repeat(g.strikes[p])}</small>`:''}</span>`).join('');
+  let body='';
+  if(g.status==='lobby'){
+    body=`<div class="banner">${isHost?(g.players.length<2?'Invite at least one more player, then start.':'Everyone in? Start when ready.'):'Waiting for '+esc(nm(g.host))+' to start the game.'}</div>
+    ${isHost?`<button class="primary" id="start" ${g.players.length<2?'disabled':''}>Start game</button>`:''}`;
+  }else if(g.status==='playing'){
+    body=myTurn?`<div class="play"><span class="lead" aria-hidden="true">${need?esc(need):'★'}</span><input id="word" placeholder="${need?'A word starting with '+need.toUpperCase():'Any word to begin'}" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="primary" id="playBtn">Play</button></div>
+      <div class="row" style="margin-top:10px"><button class="ghost" id="pass">Pass (take a strike)</button></div>`
+      :`<p class="banner">${tp?esc(nm(tp))+'’s turn'+(need?' — next word starts with '+need.toUpperCase():''):'Waiting…'}</p>`;
+    if(isPlayer&&lastLive&&lastLive.by!==me)body+=`<div class="row" style="margin-top:10px"><button class="ghost" id="challenge">Challenge “${esc(lastLive.w)}” — not a real word</button></div>`;
+    if(isHost)body+=`<div class="row" style="margin-top:10px"><button class="ghost" id="end">End game</button></div>`;
+  }else{
+    const ranked=[...g.players].sort((a,b)=>(g.scores[b]||0)-(g.scores[a]||0));
+    const top=g.scores[ranked[0]]||0,winners=ranked.filter(p=>(g.scores[p]||0)===top);
+    body=`<div class="banner">Game over. ${winners.length>1?'Tie between '+winners.map(nm).map(esc).join(' and '):esc(nm(winners[0]))+(winners[0]===me?' win':' wins')} with ${top} points across ${words.filter(w=>!w.struck).length} words.</div>
+    ${isPlayer?'<button class="primary" id="rematch">Rematch with same players</button>':''}`;
+  }
+  app.innerHTML=`
+  <div class="top"><button class="back" id="home">‹ All games</button><span class="muted">Game <span class="code">${esc(g.code.toUpperCase())}</span></span></div>
+  <h1>${g.status==='over'?'Final chain':words.length?words.filter(w=>!w.struck).length+' links':'Word chain'}</h1>
+  <div class="players">${players}</div>
+  <div class="chain" aria-live="polite">${chain||'<span class="muted">No words yet.</span>'}</div>
+  ${body}
+  <p class="msg ${flash.kind}" id="msg">${esc(flash.text)}</p>
+  ${g.status!=='over'&&isPlayer?`<div class="panel">
+    <b>Invite players</b>
+    <p class="muted" style="margin-top:4px">Send the link, or find people by name. They can join any time before the game ends.</p>
+    <div class="row"><input id="linkBox" value="${esc(link)}" readonly style="flex:1;min-width:200px"><button id="copy">Copy link</button></div>
+    <input id="who" placeholder="Search people by name" style="margin-top:10px" autocomplete="off">
+    <ul class="hits" id="hits"></ul>
+    ${(g.invited||[]).filter(i=>!g.players.includes(i)).length?`<p class="muted" style="margin-top:8px">Invited: ${esc(g.invited.filter(i=>!g.players.includes(i)).map(nm).join(', '))}</p>`:''}
+  </div>`:''}`;
+  flash={text:'',kind:''};
+  bindGame(g,need);
+  const w=document.getElementById('word');
+  if(w&&(focusInput||myTurn)){w.value=draft;if(focusInput||(prevLen>=0&&words.length!==prevLen))w.focus()}
+}
+
+function setMsg(t,k){const m=document.getElementById('msg');if(m){m.textContent=t;m.className='msg '+(k||'')}}
+function bindGame(g,need){
+  const ref=db.doc('games/'+g.code);
+  const on=(id,ev,fn)=>{const el=document.getElementById(id);if(el)el[ev]=fn};
+  on('home','onclick',()=>{location.hash=''});
+  on('start','onclick',()=>ref.update({status:'playing',turn:0,updated:Date.now()}).catch(()=>setMsg('Couldn’t start the game. Try again.','bad')));
+  on('end','onclick',()=>{if(confirm('End the game for everyone?'))ref.update({status:'over',updated:Date.now()})});
+  const play=async()=>{
+    const raw=document.getElementById('word').value.trim().toLowerCase();
+    if(!/^[a-z]{2,}$/.test(raw))return setMsg('Use letters only, at least 2 of them.','bad');
+    if(need&&raw[0]!==need)return setMsg('Your word has to start with '+need.toUpperCase()+'.','bad');
+    if((g.words||[]).some(w=>!w.struck&&w.w===raw))return setMsg('“'+raw+'” was already played. Try another.','bad');
+    const fresh=(await ref.get()).data();
+    if(turnPlayer(fresh)!==me)return setMsg('It’s not your turn anymore.','bad');
+    const words=[...fresh.words,{w:raw,by:me,t:Date.now()}];
+    await ref.update({words,scores:Object.assign({},fresh.scores,{[me]:(fresh.scores[me]||0)+raw.length}),turn:fresh.turn+1,updated:Date.now()});
+    const s=myStats||{};saveStats({words:(s.words||0)+1,longest:raw.length>(s.longest||'').length?raw:(s.longest||'')});
+  };
+  on('playBtn','onclick',play);
+  on('word','onkeydown',e=>{if(e.key==='Enter')play()});
+  on('pass','onclick',async()=>{
+    const fresh=(await ref.get()).data();if(turnPlayer(fresh)!==me)return;
+    const strikes=Object.assign({},fresh.strikes,{[me]:(fresh.strikes[me]||0)+1});
+    const tmp=Object.assign({},fresh,{strikes});const left=active(tmp);
+    const wasIdx=active(fresh).indexOf(me);
+    const out=strikes[me]>=3;
+    await ref.update({strikes,turn:out?wasIdx:fresh.turn+1,status:left.length<=1?'over':'playing',updated:Date.now()});
+  });
+  on('challenge','onclick',async()=>{
+    const fresh=(await ref.get()).data();
+    const idx=fresh.words.map(w=>!w.struck).lastIndexOf(true);if(idx<0)return;
+    const w=fresh.words[idx];if(w.by===me)return;
+    if(!confirm('Strike “'+w.w+'”? '+nm(w.by)+' loses '+w.w.length+' points and plays again.'))return;
+    const words=fresh.words.map((x,i)=>i===idx?Object.assign({},x,{struck:true}):x);
+    const a=active(fresh);const ti=Math.max(0,a.indexOf(w.by));
+    await ref.update({words,scores:Object.assign({},fresh.scores,{[w.by]:(fresh.scores[w.by]||0)-w.w.length}),turn:ti,updated:Date.now()});
+  });
+  on('rematch','onclick',async()=>{
+    const code=newCode();
+    await db.doc('games/'+code).set({code,host:me,players:[me],invited:g.players.filter(p=>p!==me),status:'lobby',words:[],turn:0,scores:{[me]:0},strikes:{[me]:0},created:Date.now(),updated:Date.now()});
+    await rememberGame(code);location.hash='g-'+code;
+  });
+  on('copy','onclick',async()=>{const b=document.getElementById('linkBox');try{await navigator.clipboard.writeText(b.value);setMsg('Link copied. Send it to your friends.','good')}catch(e){b.select();setMsg('Select the link above and copy it.','')}});
+  const who=document.getElementById('who');
+  if(who&&user&&user.search){
+    let timer;
+    const run=async()=>{
+      const hits=(await user.search(who.value.trim()).catch(()=>[])).filter(h=>!h.isMe).slice(0,6);
+      const ul=document.getElementById('hits');if(!ul)return;
+      ul.innerHTML='';
+      hits.forEach(h=>{
+        const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=h.name||'Someone';
+        const b=document.createElement('button');b.className='ghost';
+        const done=g.players.includes(h.id)||(g.invited||[]).includes(h.id);
+        b.textContent=g.players.includes(h.id)?'Playing':done?'Invited':'Invite';b.disabled=done;
+        b.onclick=async()=>{b.disabled=true;const fresh=(await ref.get()).data();if(!(fresh.invited||[]).includes(h.id))await ref.update({invited:[...(fresh.invited||[]),h.id],updated:Date.now()});};
+        li.append(sp,b);ul.append(li);
+      });
+    };
+    who.onfocus=run;who.oninput=()=>{clearTimeout(timer);timer=setTimeout(run,250)};
+  }else if(who){who.remove()}
+}
+
+function route(){const c=routeCode();if(c)openGame(c);else renderLobby()}
+
+(async function init(){
+  try{db=await claude.use('db');user=await claude.use('user');}catch(e){}
+  if(user){try{me=await user.id()}catch(e){}}
+  if(!db||!me){app.innerHTML='<h1>Word chain</h1><p>Sign in to claude.ai to play. Games and invites are saved to your account.</p>';return}
+  try{const s=await statsRef().get();if(s.exists)myStats=s.data()}catch(e){}
+  window.addEventListener('hashchange',route);
+  route();
+})();
+})();
+</script>
+</body>
+</html>

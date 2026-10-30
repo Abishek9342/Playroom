@@ -1,0 +1,19 @@
+{
+  "name": "playroom",
+  "main": "./worker/index.js",
+  "compatibility_date": "2025-09-01",
+  // The React app (built by Vite) is served as static assets; only /api/* runs the Worker.
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // Accounts and sessions. Run `npx wrangler d1 create playroom-db` and paste the id here.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "playroom-db", "database_id": "5ceb0c80-70fc-4e86-864d-54fe0beeb667" }
+  ],
+  // One Durable Object per game room, keyed by invite token.
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }] },
+  // SQLite-backed Durable Objects are what the Workers Free plan supports.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
+}

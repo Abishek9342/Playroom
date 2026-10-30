@@ -1,0 +1,4 @@
+# Copy to .dev.vars (never commit it) to try Google sign-in locally.
+# Create the OAuth client at console.cloud.google.com (see README, "Google sign-in").
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret

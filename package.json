@@ -1,0 +1,38 @@
+{
+  "name": "playroom",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite build && vite preview",
+    "deploy": "vite build && wrangler deploy",
+    "build:demo": "vite build --config vite.demo.config.js",
+    "db:local": "wrangler d1 execute playroom-db --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute playroom-db --remote --file=schema.sql",
+    "db:migrate:local": "wrangler d1 execute playroom-db --local --file=migrations/0002_google.sql",
+    "db:migrate:remote": "wrangler d1 execute playroom-db --remote --file=migrations/0002_google.sql",
+    "words": "node scripts/build-words.js",
+    "share": "npx cloudflared tunnel --url http://localhost:5173",
+    "test": "node test/games.test.js",
+    "test:e2e": "node test/e2e.mjs",
+    "test:ui": "vite build --config vite.demo.config.js && node test/ui-smoke.mjs",
+    "test:browser": "node test/browser/two-players.mjs light",
+    "screens": "vite build --config vite.demo.config.js && node test/browser/screens.mjs light && node test/browser/screens.mjs dark"
+  },
+  "dependencies": {
+    "motion": "14.2.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.63.2",
+    "@vitejs/plugin-react": "6.1.2",
+    "an-array-of-english-words": "2.0.0",
+    "jsdom": "26.1.0",
+    "vite": "8.3.4",
+    "vite-plugin-singlefile": "2.3.3",
+    "wordlist-english": "1.2.1",
+    "wrangler": "4.145.0"
+  }
+}

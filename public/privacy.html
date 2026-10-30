@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · Playroom</title>
+<meta name="description" content="What Playroom stores about you and why.">
+<link rel="icon" href="/icons/icon-192.png">
+<style>
+  :root { --bg: #F4F5F7; --surface: #fff; --text: #1D2433; --text-2: #4A5468; --border: #E2E5EA; --brand: #0F7A5C; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0B0F14; --surface: #121821; --text: #E8ECF2; --text-2: #A9B2C1; --border: #232C38; --brand: #34C796; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 Manrope, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+  a { color: var(--brand); }
+  .back { display: inline-block; margin-bottom: 20px; font-weight: 700; text-decoration: none; }
+  h1 { font-size: 2rem; letter-spacing: -.02em; margin: 0 0 4px; }
+  .updated { color: var(--text-2); margin: 0 0 24px; font-size: .9rem; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  p, li { color: var(--text-2); margin: 0 0 8px; }
+  ul { margin: 0; padding-left: 20px; }
+  b { color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="/">← Back to Playroom</a>
+  <h1>Privacy</h1>
+  <p class="updated">Last updated 30 October 2026</p>
+
+  <section>
+    <h2>The short version</h2>
+    <p>Playroom is a small games app for friends. It stores only what it needs to run your account and your games. No ads, no tracking, and nothing is sold or shared.</p>
+  </section>
+
+  <section>
+    <h2>What we store</h2>
+    <ul>
+      <li><b>Accounts:</b> your username, the name other players see, and your password in hashed form (we can’t read it).</li>
+      <li><b>Sign in with Google:</b> your Google account ID, email address and name. We use them only to sign you in and to help you get back in if you forget your password. We don’t get access to anything else in your Google account.</li>
+      <li><b>Guests:</b> the name you type when you join a room.</li>
+      <li><b>Sessions:</b> a sign-in cookie so you stay signed in (up to 30 days).</li>
+      <li><b>Games:</b> live rooms (moves, scores, who’s playing) are kept only while the room exists and are deleted automatically, at the latest a few hours after the game.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>What we don’t do</h2>
+    <ul>
+      <li>No advertising or analytics trackers.</li>
+      <li>We never sell or share your data.</li>
+      <li>We don’t send marketing email.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Where it lives</h2>
+    <p>Playroom runs on Cloudflare (Workers, Durable Objects and D1). Your data is stored there and protected by HTTPS.</p>
+  </section>
+
+  <section>
+    <h2>Deleting your data</h2>
+    <p>Email <a href="mailto:abisheksridharan.work@gmail.com">abisheksridharan.work@gmail.com</a> from the address on your account (or tell us your username) and we’ll delete your account and everything linked to it.</p>
+  </section>
+</main>
+</body>
+</html>
