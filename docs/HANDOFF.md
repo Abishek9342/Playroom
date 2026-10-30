@@ -1,5 +1,11 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-10-30 Code on GitHub: https://github.com/Abishek9342/Playroom (PUBLIC, branch main)
+- First commit 41378ce. Repo-local git identity = Abishek9342 <152966001+Abishek9342@users.noreply.github.com>
+  (keeps the work email off the public repo). Checked before pushing: no secrets (.dev.vars ignored,
+  no tokens), no other players' usernames in docs. docs/screenshots/ stays ignored (`screenshots/`).
+- Public repo: never commit .dev.vars, tokens, or real users' data.
+
 ## 2026-10-30 Leaving the screen eliminates in Word Chain ONLY (deployed)
 - `GAMES.wordchain.strictPresence = true`; `RoomCore.strict()`. Other games: hide/close = Away only
   (no grace timer, no elimination); back/rejoin clears it. Explicit Leave still eliminates in all games.
