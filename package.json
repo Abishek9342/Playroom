@@ -15,7 +15,7 @@
     "words": "node scripts/build-words.js",
     "share": "npx cloudflared tunnel --url http://localhost:5173",
     "test": "node test/games.test.js",
-    "test:e2e": "node test/e2e.mjs",
+    "test:e2e": "node test/e2e.mjs && node test/imposter-e2e.mjs",
     "test:ui": "vite build --config vite.demo.config.js && node test/ui-smoke.mjs",
     "test:browser": "node test/browser/two-players.mjs light",
     "screens": "vite build --config vite.demo.config.js && node test/browser/screens.mjs light && node test/browser/screens.mjs dark"

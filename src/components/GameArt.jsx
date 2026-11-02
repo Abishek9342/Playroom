@@ -66,7 +66,25 @@ function CardsArt() {
   );
 }
 
-const ARTS = { wordchain: WordArt, xo: XOArt, patches: PatchArt, cards: CardsArt };
+function ImposterArt() {
+  // four players with speech bubbles; one wears the Imposter's question mark
+  const person = (x, tone, imp) => (
+    <g transform={`translate(${x} 34)`} key={x}>
+      <circle cx="13" cy="12" r="10" fill={tone} />
+      <path d="M0 50a13 15 0 0 1 26 0z" fill={tone} />
+      {imp && <text x="13" y="17" textAnchor="middle" fontSize="14" fontWeight="800" fill="#1D2433">?</text>}
+    </g>
+  );
+  return (
+    <>
+      <rect x="22" y="8" width="34" height="16" rx="8" fill="var(--brand)" opacity=".9" />
+      <rect x="104" y="8" width="34" height="16" rx="8" fill="var(--accent)" opacity=".9" />
+      {person(22, '#A7D3C0')}{person(52, '#B7C8F0')}{person(82, '#F2B8B0', true)}{person(112, '#F0CF8E')}
+    </>
+  );
+}
+
+const ARTS = { wordchain: WordArt, xo: XOArt, patches: PatchArt, cards: CardsArt, imposter: ImposterArt };
 
 export function GameArt({ kind }) {
   const A = ARTS[kind];

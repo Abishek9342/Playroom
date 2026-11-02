@@ -1,9 +1,11 @@
 import { GAMES as RULES, OPTIONS, defaultOptions } from '../../shared/games.js';
+import { IMPOSTER_CATEGORIES } from '../../shared/imposterWords.js';
 
 export const GAMES = {
-  wordchain: { ...RULES.wordchain, kind: 'Word', time: '5–10 min', tagline: 'Each word starts with the last letter of the one before. Real words only, no repeats.' },
+  wordchain: { ...RULES.wordchain, kind: 'Word', time: '5–10 min', tagline: 'Each word starts with the last letter of the one before. Answer fast for more points.' },
   xo: { ...RULES.xo, kind: 'Classic', time: '2 min', tagline: 'Noughts and crosses on a 3×3 or 5×5 board. Play a single game or a best of 3 or 5.' },
   patches: { ...RULES.patches, kind: 'Puzzle race', time: '2–5 min', tagline: 'Cover the grid with patches. Each holds one clue: its size and its shape. First to solve wins.' },
+  imposter: { ...RULES.imposter, kind: 'Party', time: '5–10 min', tagline: 'Everyone gets the secret word except the Imposter. Give one-word clues, then vote out the faker.' },
   cards: { ...RULES.cards, kind: 'Cards', time: '15–30 min', tagline: 'Least Count. Drop pairs and runs, keep your points low, and Show when you’re sure you’re lowest.' },
 };
 export { OPTIONS, defaultOptions };
@@ -20,6 +22,11 @@ export const PATCH_COLORS = ['#9CC9B4', '#E9C77B', '#A9BDE8', '#E8A6A1', '#C7B3E
 export function describeOptions(game, size, options = {}) {
   const bits = [`${size} players`];
   if (game === 'cards') bits.push(`${options.decks || 1} ${options.decks > 1 ? 'decks' : 'deck'}`, `Exit at ${options.exitAt || 200}`);
+  if (game === 'imposter') {
+    const n = options.imposters || 1;
+    bits.push(`${n} ${n > 1 ? 'Imposters' : 'Imposter'}`, options.category ? IMPOSTER_CATEGORIES[options.category - 1].name : 'Mixed words',
+      options.hint === 0 ? 'No hint' : 'Imposter hint', `${options.laps || 2} clue ${(options.laps || 2) > 1 ? 'rounds' : 'round'}`);
+  }
   if (game === 'xo') bits.push(`${options.board || 3}×${options.board || 3}`, (options.bestOf || 1) > 1 ? `Best of ${options.bestOf}` : 'Single game');
   return bits;
 }

@@ -17,8 +17,9 @@ import { WordChain } from '../games/WordChain.jsx';
 import { XO } from '../games/XO.jsx';
 import { Patches } from '../games/Patches.jsx';
 import { Cards } from '../games/Cards.jsx';
+import { Imposter } from '../games/Imposter.jsx';
 
-const BOARDS = { wordchain: WordChain, xo: XO, patches: Patches, cards: Cards };
+const BOARDS = { wordchain: WordChain, xo: XO, patches: Patches, cards: Cards, imposter: Imposter };
 const inviteLink = token => `${location.origin}${location.pathname}#join-${token}`;
 async function copy(text, done, token) {
   if (await copyText(text)) toast(done);
@@ -168,7 +169,7 @@ function Game({ state, send, offset, error, practice }) {
         {state.players.map((p, i) => (
           <div role="listitem" key={p.id}>
             <Avatar player={p} you={p.id === state.you} host={i === 0 && !practice} size={44} progress={progress(p.id)}
-              score={state.game === 'cards' && g.totals ? g.totals[p.id] : undefined} />
+              score={state.game === 'cards' && g.totals ? g.totals[p.id] : state.game === 'wordchain' && g.scores ? g.scores[p.id] : undefined} />
           </div>
         ))}
       </div>
@@ -221,14 +222,17 @@ function RematchRequest({ state, send }) {
 
 function Result({ state, send, practice }) {
   const w = state.result.winner;
-  const won = w === state.you;
+  const team = state.result.winners || null; // team games (Imposter): several winners
+  const won = team ? team.includes(state.you) : w === state.you;
   const winner = state.players.find(p => p.id === w);
   const [busy, setBusy] = useState(false);
   const [hidden, setHidden] = useState(false);
   const g = state.g || {};
   const totals = state.game === 'cards' ? g.totals : null;
-  const wins = state.game === 'xo' && (g.bestOf || 1) > 1 ? g.wins : null;
-  const standings = [...state.players].sort((a, b) => (b.id === w) - (a.id === w) || (b.alive - a.alive) || (totals ? totals[a.id] - totals[b.id] : 0));
+  const wins = state.game === 'xo' && (g.bestOf || 1) > 1 ? g.wins : state.game === 'wordchain' ? g.scores : null;
+  const isWin = p => (team ? team.includes(p.id) : p.id === w);
+  const standings = [...state.players].sort((a, b) => isWin(b) - isWin(a) || (b.alive - a.alive) || (totals ? totals[a.id] - totals[b.id] : 0)
+    || (state.game === 'wordchain' && g.scores ? (g.scores[b.id] || 0) - (g.scores[a.id] || 0) : 0));
   const me = state.players.find(p => p.id === state.you);
   const asked = !!(me && me.rematch);
   const others = state.players.filter(p => p.id !== state.you && !p.bot);
@@ -253,17 +257,19 @@ function Result({ state, send, practice }) {
       <motion.div className="dialog result" role="dialog" aria-modal="true" aria-label="Game over"
         initial={{ scale: 0.92, y: 20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 320, damping: 26, delay: 0.2 }}>
         <div className={`result-icon${won ? ' won' : ''}`}><Icon name="trophy" size={30} /></div>
-        <h2 className="h-page">{won ? 'You win' : winner ? `${winner.name} wins` : 'It’s a draw'}</h2>
+        <h2 className="h-page">{team ? `${state.result.title}${won ? ': you win' : ''}` : won ? 'You win' : winner ? `${winner.name} wins` : 'It’s a draw'}</h2>
         <p className="muted">{state.result.text}.</p>
         <ol className="standings">
           {standings.map((p, i) => (
-            <li key={p.id} className={p.id === w ? 'first' : ''}>
+            <li key={p.id} className={isWin(p) ? 'first' : ''}>
               <span className="pos">{i + 1}</span>
               <Avatar player={p} size={28} compact />
               <span className="seat-name">{p.id === state.you ? 'You' : p.name}</span>
-              <span className="muted">{p.rematch && p.id !== state.you ? 'Wants a rematch' : p.id === w ? 'Winner' : p.alive ? '' : p.reason}</span>
+              <span className="muted">{p.rematch && p.id !== state.you ? 'Wants a rematch'
+                : state.game === 'imposter' && g.imposters ? (g.imposters.includes(p.id) ? 'Imposter' : 'Crew')
+                : isWin(p) ? 'Winner' : p.alive ? '' : p.reason}</span>
               {totals && <b className="pts">{totals[p.id]}</b>}
-              {wins && <b className="pts">{wins[p.id]}</b>}
+              {wins && <b className="pts">{wins[p.id] || 0}{state.game === 'wordchain' ? ' pts' : ''}</b>}
             </li>
           ))}
         </ol>

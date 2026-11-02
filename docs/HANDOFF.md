@@ -1,5 +1,41 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-11-02 NEW GAME: Imposter (like imposter.app) — built + tested locally, NOT DEPLOYED yet
+- User choices: typed one-word clues (online rooms), a one-phone pass-and-play mode, one round per
+  game (Rematch = new word + new Imposter).
+- Server rules: `class Imposter` in shared/games.js; words in shared/imposterWords.js (8 categories ×
+  24, incl. India). Phases reveal (20 s, "I've seen my card") → clues (30 s each, `laps` rounds, one word,
+  not the secret or part of it, no repeats, timeout = skipped) → vote (chat + vote, `voteSecs`) →
+  lastchance (caught Imposter gets one 25 s guess) → over. Imposter may guess any time (right wins,
+  wrong loses). Tie / nobody voted / wrong player = Imposters win. Leaving: Imposter leaves = crew
+  wins; crew ≤ Imposters = Imposters win. Secrets: word never in an Imposter's view; Imposter ids never
+  in a crew view until over (Imposters see each other). Not strict-presence.
+- Host options: imposters 1|2 (2 needs 5+ players), category 0..8 (0 mixed), hint 0|1 (category to
+  Imposter), laps 1–3, voteSecs 30–180. Players 3–10.
+- Team results: RoomCore.finish(winner, text, {winners, title}); Result dialog shows "The crew wins:
+  you win", Crew/Imposter labels.
+- UI: src/games/Imposter.jsx (secret card hidden until tapped, clues, vote first then clues + chat,
+  last chance, reveal), src/screens/PassPlay.jsx at #pass-imposter (names, settings, pass the phone,
+  timer, reveal; names remembered in localStorage). Settings sheet: "Play on one phone" replaces bots.
+  GameArt + guide added. Landing game strip now 5 across (was leaving one orphan).
+- Tests: unit (secrets, turns, vote, tie, last chance, early guess, leaving, hint, 2 Imposters),
+  test/imposter-e2e.mjs (4 players over WebSockets, 15 checks; part of `npm run test:e2e`), 4-browser
+  Edge run + pass-and-play screenshots, ui-smoke, full e2e. All pass.
+- DEPLOYED 2026-11-02 after the user said "deploy it and also push to git". Live imposter-e2e passed;
+  its 4 test accounts were deleted. Pushed to GitHub together with the Word Chain scoring work.
+
+## 2026-10-31 Word Chain scoring (DEPLOYED, not yet pushed to GitHub)
+- 30 s per turn (WC_TURN_MS). Valid word scores by speed, timed on the server from turn start:
+  within 5 s = 5, 10 s = 3, 15 s = 2, later = 1 (`wordPoints`, `WC_POINTS`). Timeout still eliminates.
+- First to 250 points wins (`WC_TARGET`, result text "Reached 250 points"); last standing still wins.
+- Sets: one lap of the table (every alive player plays once). The view sends only the current set
+  (+ `prev`, the last word, while a new set is empty) with `set` and `total`; the no-repeat rule uses
+  the whole game's `used`. UI: "Set N · X earlier words hidden" line, +points chip per word, speed
+  ladder under the input, "your points n/250", scores on avatars and in results.
+- Composer keyed per word so the input is empty every turn (old text could linger).
+- Tests: points/sets/250/hidden-repeat unit tests; ui-smoke + e2e pass; checked live after deploy.
+- Test-script note: read the needed letter after the flip animation (two .lt nodes exist briefly).
+
 ## 2026-10-30 Code on GitHub: https://github.com/Abishek9342/Playroom (PUBLIC, branch main)
 - First commit 41378ce. Repo-local git identity = Abishek9342 <152966001+Abishek9342@users.noreply.github.com>
   (keeps the work email off the public repo). Checked before pushing: no secrets (.dev.vars ignored,

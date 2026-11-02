@@ -39,7 +39,7 @@ function MiniBoard({ n, cells }) {
 const GUIDES = {
   wordchain: () => (
     <>
-      <p className="g-goal">Keep the chain going. Miss your turn and you’re out; the last player standing wins.</p>
+      <p className="g-goal">Keep the chain going and score points for speed. First to 250 points wins. Miss your turn and you’re out; if everyone else is out, you win.</p>
       <div className="g-chain" aria-label="Example chain: apple, eagle, elephant, tiger">
         {['apple', 'eagle', 'elephant', 'tiger'].map((w, i) => (
           <span key={w} className="g-word-wrap">
@@ -52,9 +52,18 @@ const GUIDES = {
         <ol className="g-steps">
           <Step n={1} title="Start with the last letter">Your word begins with the last letter of the word before it. The first player can start with anything.</Step>
           <Step n={2} title="Real words only">At least 2 letters, letters only. Words are checked against a 275,000-word English dictionary.</Step>
-          <Step n={3} title="No repeats">A word that’s already been played can’t be used again.</Step>
-          <Step n={4} title="Beat the clock">You have 20 seconds. Run out of time and you’re out of the game.</Step>
+          <Step n={3} title="No repeats">A word that’s already been played in this game can’t be used again. The screen only shows the current set (one turn each), but earlier words still count.</Step>
+          <Step n={4} title="Beat the clock">You have 30 seconds. Run out of time and you’re out of the game.</Step>
         </ol>
+      </Section>
+      <Section title="Points for speed">
+        <div className="g-grid g-points-wc">
+          <div><b className="g-big">+5</b><span>within 5 seconds</span></div>
+          <div><b className="g-big">+3</b><span>within 10 seconds</span></div>
+          <div><b className="g-big">+2</b><span>within 15 seconds</span></div>
+          <div><b className="g-big">+1</b><span>within 30 seconds</span></div>
+        </div>
+        <p className="g-text">Every valid word scores. The clock starts when your turn starts, and your total shows on your avatar. <b>The first player to reach 250 points wins.</b></p>
       </Section>
       <Section title="Tips">
         <ul className="g-tips">
@@ -118,6 +127,35 @@ const GUIDES = {
           <li>A patch takes its clue’s colour, and its outline turns solid once it matches.</li>
           <li>Tap a patch to remove it. Drawing over a patch replaces it.</li>
           <li>Start with clues that only fit one way: big numbers near corners, and squares.</li>
+        </ul>
+      </Section>
+      <Leaving />
+    </>
+  ),
+
+  imposter: () => (
+    <>
+      <p className="g-goal">Everyone gets the same secret word, except the Imposter. Give clues that show you know the word, then work out who’s faking it.</p>
+      <Section title="How a round works">
+        <ol className="g-steps">
+          <Step n={1} title="Look at your card">Tap your card to see it. You get the secret word, or you’re told you’re the Imposter (with the category as a hint, if the host turned it on).</Step>
+          <Step n={2} title="Give one-word clues">Take turns typing one word about the secret word. Not the word itself, and no repeats. You have 30 seconds a clue.</Step>
+          <Step n={3} title="Talk and vote">Chat about whose clue didn’t fit, then vote. You can change your vote until everyone has voted.</Step>
+          <Step n={4} title="Last chance">If the Imposter is caught, they get one guess at the secret word. Right, and the Imposter still wins.</Step>
+        </ol>
+      </Section>
+      <Section title="Who wins">
+        <ul className="g-tips">
+          <li><b>The crew</b> wins by voting out the Imposter (and the Imposter’s last guess is wrong).</li>
+          <li><b>The Imposter</b> wins if the vote picks the wrong player or ends in a tie, or by guessing the word.</li>
+          <li>The Imposter can guess the word at any time. Right wins straight away; wrong loses.</li>
+        </ul>
+      </Section>
+      <Section title="Tips">
+        <ul className="g-tips">
+          <li>Crew: be specific enough for the crew, vague enough that the Imposter can’t work it out.</li>
+          <li>Imposter: listen first, then give a clue that could fit what others said.</li>
+          <li>No phones handy? Use <b>Play on one phone</b> and pass it round the table.</li>
         </ul>
       </Section>
       <Leaving />

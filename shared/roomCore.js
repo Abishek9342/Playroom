@@ -103,7 +103,7 @@ export class RoomCore {
       },
       eliminate: (id, reason) => this.eliminate(id, reason),
       match: () => this.match,
-      finish: (winner, text) => this.finish(winner, text),
+      finish: (winner, text, extra) => this.finish(winner, text, extra),
     };
   }
 
@@ -130,14 +130,15 @@ export class RoomCore {
     this.onChange();
   }
 
-  finish(winner, text) {
+  // extra: { winners: [ids], title } for team games (Imposter), where several players win together
+  finish(winner, text, extra = {}) {
     if (this.status === 'over') return;
     this.status = 'over';
-    this.result = { winner, text };
+    this.result = { winner, text, ...extra };
     this.stopTimers();
     for (const p of this.players) p.away = false;
     const w = this.find(winner);
-    this.log(w ? `${w.name} won` : 'Game over');
+    this.log(w ? `${w.name} won` : extra.title || 'Game over');
     this.onChange();
     this.onFinish();
   }

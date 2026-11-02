@@ -8,7 +8,7 @@ Everything runs on Cloudflare's free plan.
 
 | Game | Players | Rules |
 |---|---|---|
-| Word Chain | 2–8 | Each word starts with the last letter of the previous one. Must be a real English word (~275k-word dictionary). No repeats. 20 s per turn. |
+| Word Chain | 2–8 | Each word starts with the last letter of the previous one. Must be a real English word (~275k-word dictionary). No repeats. 30 s per turn; a valid word scores 5 / 3 / 2 / 1 points if played within 5 / 10 / 15 / 30 s. First to 250 points wins. The screen shows only the current set (one turn each); no word may repeat in the whole game. |
 | XO | 2 | Noughts and crosses. 20 s per move. |
 | Patches | 2–8 | Shikaku race: split the grid into rectangles, one number each, number = area. First valid quilt wins. |
 | 5 Cards (Least Count) | 2–8 (host picks 1–3 decks and the exit point) | Keep your hand's points low. Each turn drop a card or sets (pairs, kinds, runs), then draw or take from the previous drop. Show when you think you're lowest: valid Show = others add their hands; invalid Show (anyone equal or lower) = you +50. 3 jokers per deck, worth 0. Out at 200. |

@@ -70,7 +70,7 @@ export class LocalRoom {
       if (!p.bot || !p.alive) continue;
       let key, delay, act;
       if (c.cfg.game === 'wordchain' && g.turn === p.id) {
-        key = `w${g.words.length}`; delay = rand(1300, 3800);
+        key = `w${g.words.length}`; delay = rand(1300, 3800); // g is the game itself here: full word list
         act = () => { const w = this.botWord(g); if (w) c.move(p.id, { type: 'word', word: w }); };
       } else if (c.cfg.game === 'xo' && g.turn === p.id && g.phase === 'play') {
         key = `x${g.round}-${g.board.filter(Boolean).length}`; delay = rand(600, 1400);

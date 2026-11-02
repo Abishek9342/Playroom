@@ -15,6 +15,40 @@ function makeCtx(ids) {
   return ctx;
 }
 
+// Word chain: points by speed (5 within 5 s, 3 within 10 s, 2 within 15 s, else 1)
+{
+  const { wordPoints } = await import('../shared/games.js');
+  assert.deepEqual([0, 5000, 5001, 10000, 10001, 15000, 15001, 29999].map(wordPoints), [5, 5, 3, 3, 2, 2, 1, 1]);
+  const realNow = Date.now;
+  let t = 1_000_000;
+  Date.now = () => t;
+  const ctx = makeCtx(['a', 'b']);
+  const g = ctx.game = createGame('wordchain', ctx); g.start();
+  t += 4000; assert.equal(g.handle('a', { type: 'word', word: 'cat' }), null);   // 4 s -> 5
+  t += 12000; assert.equal(g.handle('b', { type: 'word', word: 'tea' }), null);  // 12 s -> 2
+  t += 9000; assert.equal(g.handle('a', { type: 'word', word: 'ant' }), null);   // 9 s -> 3
+  t += 20000; assert.equal(g.handle('b', { type: 'word', word: 'top' }), null);  // 20 s -> 1
+  t += 1000; assert.match(g.handle('a', { type: 'word', word: 'q' }), /letters only/); // invalid scores nothing
+  assert.deepEqual(g.view().scores, { a: 8, b: 3 });
+  assert.deepEqual(g.words.map(w => w.pts), [5, 2, 3, 1]);
+  assert.equal(g.view().turnMs, 30000);
+  // sets: 2 players -> each lap of 2 words is a set; the view shows only the current set
+  assert.equal(g.view().set, 3);
+  assert.deepEqual(g.view().words, []);
+  assert.equal(g.view().prev.w, 'top', 'between sets, the last word stays visible');
+  assert.equal(g.view().total, 4);
+  t += 1000; assert.equal(g.handle('a', { type: 'word', word: 'pig' }), null);
+  assert.deepEqual(g.view().words.map(x => x.w), ['pig']);
+  assert.equal(g.view().prev, null);
+  t += 1000; assert.match(g.handle('b', { type: 'word', word: 'gnat' }) || '', /^$/);
+  t += 1000; assert.equal(g.handle('a', { type: 'word', word: 'tea' }), '“tea” was already played. Words can’t repeat.', 'hidden words still block repeats');
+  // first to 250 wins
+  g.scores.a = 247;
+  t += 1000; assert.equal(g.handle('a', { type: 'word', word: 'tusk' }), null); // +5 -> 252
+  assert.deepEqual(ctx.result, { winner: 'a', text: 'Reached 250 points' });
+  Date.now = realNow;
+  console.log('word chain points ok');
+}
 // Word chain
 {
   const ctx = makeCtx(['a', 'b', 'c']);
@@ -384,4 +418,101 @@ for (let t = 0; t < 2000; t++) {
   assert.equal(usernameBase({ email: 'ab@x.com', name: 'Zoë Ng' }), 'ZoeNg');
   assert.equal(usernameBase({ email: '李@x.com', name: '李' }), 'player');
   console.log('google ok');
+}
+
+// Imposter: secrets stay secret, clue turns, vote, last-chance guess, ties, leaving
+{
+  const mk = (ids, options) => {
+    const ctx = makeCtx(ids);
+    ctx.finish = (winner, text, extra) => { ctx.result = { winner, text, ...extra }; };
+    const g = ctx.game = createGame('imposter', ctx, { options });
+    g.start();
+    return { ctx, g };
+  };
+  const ids = ['a', 'b', 'c', 'd'];
+  let { ctx, g } = mk(ids, { imposters: 1, hint: 0, laps: 1, voteSecs: 60 });
+  const imp = g.imposters[0], crew = ids.filter(x => x !== imp);
+  // secrets: the Imposter never sees the word (or the category without a hint); crew never sees who
+  assert.equal(g.view(imp).word, null);
+  assert.equal(g.view(imp).category, null);
+  assert.equal(g.view(imp).role, 'imposter');
+  for (const c of crew) { assert.equal(g.view(c).word, g.word); assert.equal(g.view(c).imposters, null); assert.equal(g.view(c).role, 'crew'); }
+  assert.ok(!JSON.stringify(g.view(imp)).includes(`"${g.word}"`), 'word not anywhere in the Imposter view');
+  // reveal -> everyone ready -> clues
+  ids.forEach(x => g.handle(x, { type: 'ready' }));
+  assert.equal(g.phase, 'clues');
+  const first = g.turn;
+  assert.equal(g.handle(ids.find(x => x !== first), { type: 'clue', text: 'hello' }), 'It’s not your turn.');
+  assert.match(g.handle(first, { type: 'clue', text: 'two words' }), /One word/);
+  assert.match(g.handle(first, { type: 'clue', text: g.word.split(' ')[0] }), /gives the word away/);
+  assert.equal(g.handle(first, { type: 'clue', text: 'shiny' }), null);
+  assert.equal(g.handle(g.turn, { type: 'clue', text: 'Shiny' }), 'Someone already said that.');
+  // remaining players: one clue each, one of them times out (skipped, not out)
+  g.handle(g.turn, { type: 'clue', text: 'bright' });
+  ctx.timerFn(); // this player runs out of time -> clue skipped
+  assert.equal(g.clues.at(-1).text, null);
+  g.handle(g.turn, { type: 'clue', text: 'round' });
+  assert.equal(g.phase, 'vote', 'one lap of clues, then the vote');
+  assert.equal(g.clues.length, 4);
+  // chat + votes: crew all vote the Imposter -> caught -> last-chance guess (wrong) -> crew wins
+  assert.equal(g.handle(crew[0], { type: 'chat', text: 'pretty sure it is them' }), null);
+  assert.equal(g.view(imp).messages.length, 1);
+  assert.equal(g.handle(crew[0], { type: 'vote', who: crew[0] }), 'You can’t vote for yourself.');
+  crew.forEach(c => g.handle(c, { type: 'vote', who: imp }));
+  g.handle(imp, { type: 'vote', who: crew[0] });
+  assert.equal(g.phase, 'lastchance');
+  assert.equal(g.handle(crew[0], { type: 'guess', text: g.word }), 'Only an Imposter can guess the word.');
+  g.handle(imp, { type: 'guess', text: 'definitelynotit' });
+  assert.equal(ctx.result.title, 'The crew wins');
+  assert.deepEqual([...ctx.result.winners].sort(), [...crew].sort());
+  assert.equal(g.view(crew[0]).imposters[0], imp, 'revealed at the end');
+
+  // caught but guesses the word right -> Imposter wins
+  ({ ctx, g } = mk(ids, { laps: 1 }));
+  let im = g.imposters[0];
+  ids.forEach(x => g.handle(x, { type: 'ready' }));
+  for (let i = 0; i < 4; i++) g.handle(g.turn, { type: 'clue', text: 'clue' + 'abcd'[i] });
+  ids.filter(x => x !== im).forEach(c => g.handle(c, { type: 'vote', who: im }));
+  g.handle(im, { type: 'vote', who: ids.find(x => x !== im) });
+  g.handle(im, { type: 'guess', text: g.word.toUpperCase() });
+  assert.equal(ctx.result.title, 'The Imposter wins');
+  assert.equal(ctx.result.text, 'Caught, but guessed the word');
+  assert.deepEqual(ctx.result.winners, [im]);
+
+  // wrong player voted out -> Imposter wins; tie -> Imposter wins
+  ({ ctx, g } = mk(ids, { laps: 1 }));
+  im = g.imposters[0];
+  let cr = ids.filter(x => x !== im);
+  ids.forEach(x => g.handle(x, { type: 'ready' }));
+  for (let i = 0; i < 4; i++) g.handle(g.turn, { type: 'clue', text: 'word' + 'abcd'[i] });
+  ids.forEach(x => g.handle(x, { type: 'vote', who: x === cr[0] ? cr[1] : cr[0] }));
+  assert.equal(ctx.result.text, 'The vote caught the wrong player');
+  ({ ctx, g } = mk(ids, { laps: 1 }));
+  ids.forEach(x => g.handle(x, { type: 'ready' }));
+  for (let i = 0; i < 4; i++) g.handle(g.turn, { type: 'clue', text: 'word' + 'abcd'[i] });
+  g.handle('a', { type: 'vote', who: 'b' }); g.handle('b', { type: 'vote', who: 'a' });
+  g.handle('c', { type: 'vote', who: 'a' }); g.handle('d', { type: 'vote', who: 'b' });
+  assert.equal(ctx.result.text, 'The vote was tied');
+
+  // the Imposter guesses early: right wins, wrong loses
+  ({ ctx, g } = mk(ids, {}));
+  ids.forEach(x => g.handle(x, { type: 'ready' }));
+  g.handle(g.imposters[0], { type: 'guess', text: 'nope' });
+  assert.equal(ctx.result.text, 'The Imposter guessed wrong');
+
+  // the Imposter leaves -> crew wins
+  ({ ctx, g } = mk(ids, {}));
+  im = g.imposters[0];
+  ctx.eliminate(im);
+  assert.equal(ctx.result.title, 'The crew wins');
+
+  // hint on: the Imposter sees the category but never the word; two Imposters know each other
+  ({ ctx, g } = mk(['a', 'b', 'c', 'd', 'e'], { imposters: 2, hint: 1 }));
+  const [i1, i2] = g.imposters;
+  assert.equal(g.view(i1).category, g.category);
+  assert.equal(g.view(i1).word, null);
+  assert.deepEqual([...g.view(i1).imposters].sort(), [i1, i2].sort());
+  assert.equal(normalizeOptions('imposter', 4, { imposters: 2 }).error, 'Two Imposters need at least 5 players.');
+  assert.deepEqual(normalizeOptions('imposter', 6, {}).options, { imposters: 1, category: 0, hint: 1, laps: 2, voteSecs: 90 });
+  console.log('imposter ok');
 }

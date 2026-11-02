@@ -1,0 +1,12 @@
+// Secret words for Imposter, by category. Everyday things most players can give a clue for.
+// Category index + 1 is the host setting (0 = mixed, any category).
+export const IMPOSTER_CATEGORIES = [
+  { name: 'Food', words: ['pizza', 'burger', 'noodles', 'ice cream', 'chocolate', 'sandwich', 'pancake', 'popcorn', 'salad', 'sushi', 'soup', 'cake', 'cookie', 'mango', 'banana', 'cheese', 'omelette', 'donut', 'fries', 'pasta', 'honey', 'watermelon', 'coffee', 'lemonade'] },
+  { name: 'Animals', words: ['elephant', 'giraffe', 'penguin', 'tiger', 'kangaroo', 'dolphin', 'parrot', 'snake', 'camel', 'zebra', 'monkey', 'owl', 'shark', 'rabbit', 'peacock', 'crocodile', 'octopus', 'panda', 'horse', 'bee', 'butterfly', 'frog', 'squirrel', 'whale'] },
+  { name: 'Places', words: ['beach', 'airport', 'hospital', 'library', 'cinema', 'zoo', 'school', 'museum', 'gym', 'restaurant', 'park', 'temple', 'market', 'stadium', 'bank', 'hotel', 'railway station', 'jungle', 'desert', 'island', 'mountain', 'mall', 'farm', 'bakery'] },
+  { name: 'Jobs', words: ['doctor', 'teacher', 'pilot', 'chef', 'farmer', 'police officer', 'firefighter', 'dentist', 'artist', 'singer', 'engineer', 'astronaut', 'lawyer', 'nurse', 'photographer', 'barber', 'tailor', 'electrician', 'driver', 'scientist', 'actor', 'cricketer', 'postman', 'magician'] },
+  { name: 'Things at home', words: ['fridge', 'pillow', 'mirror', 'toothbrush', 'umbrella', 'clock', 'television', 'sofa', 'blanket', 'candle', 'kettle', 'ladder', 'scissors', 'remote', 'broom', 'washing machine', 'fan', 'laptop', 'key', 'bucket', 'curtain', 'spoon', 'charger', 'calendar'] },
+  { name: 'Sports & games', words: ['cricket', 'football', 'chess', 'tennis', 'badminton', 'kabaddi', 'swimming', 'boxing', 'basketball', 'carrom', 'cycling', 'golf', 'hockey', 'volleyball', 'skating', 'archery', 'wrestling', 'yoga', 'marathon', 'table tennis', 'surfing', 'ludo', 'bowling', 'karate'] },
+  { name: 'Travel', words: ['passport', 'suitcase', 'train', 'aeroplane', 'tent', 'map', 'camera', 'boat', 'bus', 'sunglasses', 'ticket', 'backpack', 'hotel room', 'compass', 'auto rickshaw', 'bicycle', 'helicopter', 'submarine', 'road trip', 'souvenir', 'postcard', 'campfire', 'cruise', 'scooter'] },
+  { name: 'India', words: ['biryani', 'dosa', 'samosa', 'chai', 'Diwali', 'Holi', 'Taj Mahal', 'Bollywood', 'saree', 'rangoli', 'jalebi', 'idli', 'paneer', 'auto rickshaw', 'IPL', 'Pongal', 'filter coffee', 'mehendi', 'gulab jamun', 'lassi', 'cricket bat', 'wedding', 'monsoon', 'tiffin'] },
+];

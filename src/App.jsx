@@ -6,6 +6,7 @@ import { normalizeOptions } from '../shared/games.js';
 import { Landing } from './screens/Landing.jsx';
 import { Home } from './screens/Home.jsx';
 import { RemoteRoom, PracticeRoom } from './screens/Room.jsx';
+import { PassPlay } from './screens/PassPlay.jsx';
 import { Toaster } from './components/Toaster.jsx';
 import { Confirmer } from './components/Confirmer.jsx';
 import { InstallButton } from './components/InstallButton.jsx';
@@ -40,6 +41,7 @@ function parse(hash) {
     }
   }
   if (hash === '#practice') return { kind: 'practice-home', key: 'home' };
+  if (hash === '#pass-imposter') return { kind: 'pass', key: 'pass' };
   return { kind: 'home', key: 'home' };
 }
 
@@ -86,13 +88,14 @@ export default function App() {
   const route = parse(hash);
   let screen, key = route.key;
   if (user === undefined) { key = 'loading'; screen = <div className="empty-state"><span className="spinner" aria-label="Loading" /></div>; }
+  else if (route.kind === 'pass') screen = <PassPlay />;
   else if (route.kind === 'practice') screen = <PracticeRoom game={route.game} size={route.size} options={route.options} name={user ? user.name : 'You'} />;
   else if (route.kind === 'practice-home' || DEMO) screen = <Home user={user} />;
   else if (!user) { key = 'landing'; screen = <Landing config={config} onSignedIn={u => { remember(u); setUser(u); }} inviteToken={route.kind === 'join' ? route.token : null} />; }
   else if (route.kind === 'room' || route.kind === 'join') screen = <RemoteRoom token={route.token} />;
   else screen = <Home user={user} />;
 
-  const inRoom = route.kind === 'room' || route.kind === 'join' || route.kind === 'practice';
+  const inRoom = route.kind === 'room' || route.kind === 'join' || route.kind === 'practice' || route.kind === 'pass';
   return (
     <div className={`app${inRoom ? ' in-room' : ''}`}>
       {!inRoom && key !== 'landing' && (

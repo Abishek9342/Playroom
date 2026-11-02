@@ -9,6 +9,7 @@ import { Sheet } from '../components/Sheet.jsx';
 import { Stepper, Segmented } from '../components/Controls.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { GuideBody } from '../components/Guide.jsx';
+import { IMPOSTER_CATEGORIES } from '../../shared/imposterWords.js';
 
 export function practiceHash(game, players, options = {}) {
   let h = `practice-${game}-${players}`;
@@ -103,6 +104,7 @@ function Settings({ game, canHost, guest, onGuide, onClose }) {
 
   const changePlayers = n => {
     setPlayers(n);
+    if (n < 5 && opts.imposters > 1) setOpts(o => ({ ...o, imposters: 1 }));
     if (!decksTouched && spec.decks) setOpts(o => ({ ...o, decks: defaultOptions(game, n).decks }));
   };
   async function create() {
@@ -113,7 +115,7 @@ function Settings({ game, canHost, guest, onGuide, onClose }) {
       location.hash = 'room-' + token;
     } catch (err) { toast(err.message); setBusy(false); }
   }
-  const practice = () => { onClose(); location.hash = practiceHash(game, players, opts); };
+  const practice = () => { onClose(); location.hash = game === 'imposter' ? 'pass-imposter' : practiceHash(game, players, opts); };
 
   return (
     <div className="settings">
@@ -139,6 +141,43 @@ function Settings({ game, canHost, guest, onGuide, onClose }) {
             options={[{ value: 1, label: 'Single' }, { value: 3, label: 'Best of 3' }, { value: 5, label: 'Best of 5' }]} />
         </div>
       )}
+      {spec.imposters && (
+        <div className="setting-row">
+          <div className="setting-label"><b>Imposters</b><span>Two needs 5+ players</span></div>
+          <Segmented id="imposters" label="Imposters" value={opts.imposters} onChange={v => setOpts(o => ({ ...o, imposters: v }))}
+            options={[{ value: 1, label: '1' }, ...(players >= 5 ? [{ value: 2, label: '2' }] : [])]} />
+        </div>
+      )}
+      {spec.category && (
+        <div className="setting-row">
+          <div className="setting-label"><b>Category</b><span>Where the secret word comes from</span></div>
+          <select className="input select" value={opts.category} aria-label="Category" onChange={e => setOpts(o => ({ ...o, category: +e.target.value }))}>
+            <option value={0}>Mixed</option>
+            {IMPOSTER_CATEGORIES.map((c, i) => <option key={c.name} value={i + 1}>{c.name}</option>)}
+          </select>
+        </div>
+      )}
+      {spec.hint && (
+        <div className="setting-row">
+          <div className="setting-label"><b>Imposter hint</b><span>Imposter sees the category</span></div>
+          <Segmented id="hint" label="Imposter hint" value={opts.hint} onChange={v => setOpts(o => ({ ...o, hint: v }))}
+            options={[{ value: 0, label: 'Off' }, { value: 1, label: 'On' }]} />
+        </div>
+      )}
+      {spec.laps && (
+        <div className="setting-row">
+          <div className="setting-label"><b>Clue rounds</b><span>Times round the table</span></div>
+          <Segmented id="laps" label="Clue rounds" value={opts.laps} onChange={v => setOpts(o => ({ ...o, laps: v }))}
+            options={[1, 2, 3].map(v => ({ value: v, label: String(v) }))} />
+        </div>
+      )}
+      {spec.voteSecs && (
+        <div className="setting-row">
+          <div className="setting-label"><b>Discussion</b><span>Chat and vote</span></div>
+          <Stepper label="discussion time" value={opts.voteSecs} min={spec.voteSecs.min} max={spec.voteSecs.max} step={spec.voteSecs.step}
+            onChange={v => setOpts(o => ({ ...o, voteSecs: v }))} format={v => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`} />
+        </div>
+      )}
       {spec.decks && (
         <div className="setting-row">
           <div className="setting-label"><b>Decks</b><span>52 cards + 3 jokers each</span></div>
@@ -156,7 +195,7 @@ function Settings({ game, canHost, guest, onGuide, onClose }) {
         {canHost && <button className="btn btn-primary btn-block" onClick={create} disabled={busy}>{busy ? 'Creating room…' : 'Create room'}</button>}
         {guest && <p className="note"><Icon name="info" size={16} /> You’re playing as a guest. To host a room, sign out and create a free account.</p>}
         <button className={`btn ${canHost ? 'btn-secondary' : 'btn-primary'} btn-block`} onClick={practice}>
-          <Icon name="bot" size={18} /> Practice with bots
+          {game === 'imposter' ? <><Icon name="users" size={18} /> Play on one phone</> : <><Icon name="bot" size={18} /> Practice with bots</>}
         </button>
       </div>
     </div>
