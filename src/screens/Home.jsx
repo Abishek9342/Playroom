@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { api, DEMO } from '../lib/api.js';
-import { GAMES, OPTIONS, defaultOptions } from '../lib/meta.js';
+import { GAMES, OPTIONS, defaultOptions, GAME_COLORS } from '../lib/meta.js';
 import { toast } from '../lib/toast.js';
 import { TokenInput } from '../components/TokenInput.jsx';
 import { GameArt } from '../components/GameArt.jsx';
@@ -64,7 +64,7 @@ export function Home({ user }) {
         </div>
         <motion.div className="game-grid" initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.05 } } }}>
           {Object.entries(GAMES).map(([k, g]) => (
-            <motion.button key={k} className="game-card" onClick={() => setOpen(k)}
+            <motion.button key={k} className="game-card" style={{ '--game': GAME_COLORS[k] }} onClick={() => setOpen(k)}
               variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }} whileTap={{ scale: 0.985 }}>
               <div className="game-card-art"><GameArt kind={k} /></div>
               <div className="game-card-body">

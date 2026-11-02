@@ -5,6 +5,9 @@ import { Sheet } from './Sheet.jsx';
 import { Field } from './Controls.jsx';
 import { Icon } from './Icon.jsx';
 import { GoogleMark } from './Google.jsx';
+import { VibrateSwitch } from '../screens/Room.jsx';
+import { levelInfo, levelTitle } from '../../shared/xp.js';
+import { Ranking } from './Ranking.jsx';
 
 // Account: who you are, Google connection, set/change password, sign out.
 // reset = arrived from the forgot-password flow (fresh Google sign-in): no current password needed.
@@ -48,6 +51,13 @@ export function AccountSheet({ open, onClose, user, config, reset, onUser, onSig
           <span className="account-avatar" aria-hidden="true">{(user.name || '?').slice(0, 1).toUpperCase()}</span>
           <div><b>{user.name}</b><span>{user.guest ? 'Guest: you joined with a name only' : `Username: ${user.username}`}</span></div>
         </div>
+        <div className="acct-stats">
+          <div><small>Level</small><b>{levelInfo(user.xp || 0).level}</b><span>{levelTitle(levelInfo(user.xp || 0).level)}</span></div>
+          <div><small>XP</small><b>{user.xp || 0}</b><span>{levelInfo(user.xp || 0).to - (user.xp || 0)} to next</span></div>
+          <div><small>Streak</small><b>{user.streak || 0}</b><span>best {Math.max(user.bestStreak || 0, user.streak || 0)}</span></div>
+        </div>
+        {!user.guest && <a className="btn btn-secondary btn-block" href="#daily" onClick={onClose}><Icon name="bolt" size={18} /> Daily puzzle</a>}
+        {!user.guest && <Ranking />}
 
         {!user.guest && (
           <>
@@ -86,6 +96,8 @@ export function AccountSheet({ open, onClose, user, config, reset, onUser, onSig
           </>
         )}
 
+        <VibrateSwitch />
+        {user.admin && <a className="btn btn-secondary btn-block" href="#admin" onClick={onClose}><Icon name="users" size={18} /> Admin panel</a>}
         <button className="btn btn-secondary btn-block" onClick={onSignOut}><Icon name="logout" size={18} /> Sign out</button>
       </div>
     </Sheet>

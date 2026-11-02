@@ -12,6 +12,9 @@ import { Confetti } from '../components/Confetti.jsx';
 import { Sheet } from '../components/Sheet.jsx';
 import { GuideBody } from '../components/Guide.jsx';
 import { copyText } from '../lib/clipboard.js';
+import { buzz, vibrateOn, setVibrate, onVibrate } from '../lib/haptics.js';
+import { VoiceContext, VoiceDock, useVoice, useReactions } from '../components/VoiceDock.jsx';
+import { drawWinCard, shareWinCard } from '../lib/winCard.js';
 import { TURN_MS } from '../../shared/games.js';
 import { WordChain } from '../games/WordChain.jsx';
 import { XO } from '../games/XO.jsx';
@@ -37,8 +40,11 @@ export function PracticeRoom({ game, size, name, options }) {
   return <Table {...room} practice />;
 }
 
-function Table({ state, send, fatal, error, offset, practice }) {
+function Table({ state, send, fatal, error, offset, practice, subscribeRtc, subscribeReact }) {
   const lastErr = useRef(0);
+  const voice = useVoice(practice ? null : state, send, practice ? null : subscribeRtc);
+  const reactions = useReactions(practice ? null : subscribeReact);
+  const ctxValue = { ...voice.snap, reactions };
   const [guide, setGuide] = useState(false);
   useEffect(() => { if (error && error.n !== lastErr.current) { lastErr.current = error.n; toast(error.message); } }, [error]);
 
@@ -62,6 +68,7 @@ function Table({ state, send, fatal, error, offset, practice }) {
   }
 
   return (
+    <VoiceContext.Provider value={ctxValue}>
     <div className={`room room-${state.game}${state.status === 'waiting' ? '' : ' in-game'}`}>
       <div className="room-bar">
         <button className="icon-btn" onClick={back} aria-label="Back to games"><Icon name="back" /></button>
@@ -80,6 +87,7 @@ function Table({ state, send, fatal, error, offset, practice }) {
         )}
       </div>
       <Sheet open={guide} onClose={() => setGuide(false)} title={`How to play ${g.name}`}>
+        <VibrateSwitch />
         <GuideBody game={state.game} />
         <button className="btn btn-primary btn-block guide-back" onClick={() => setGuide(false)}>Got it</button>
       </Sheet>
@@ -88,7 +96,9 @@ function Table({ state, send, fatal, error, offset, practice }) {
           ? <Lobby key="lobby" state={state} practice={practice} />
           : <Game key="game" state={state} send={send} offset={offset} error={error} practice={practice} />}
       </AnimatePresence>
+      {!practice && <VoiceDock state={state} snap={voice.snap} mesh={voice.mesh} send={send} />}
     </div>
+    </VoiceContext.Provider>
   );
 }
 
@@ -96,6 +106,16 @@ function Table({ state, send, fatal, error, offset, practice }) {
 function Lobby({ state, practice }) {
   const seats = Array.from({ length: state.size }, (_, i) => state.players[i] || null);
   const link = inviteLink(state.token);
+  // Share link: the phone's share sheet (WhatsApp, Telegram, SMS…); without one, WhatsApp directly
+  const shareLink = async () => {
+    const text = `Join my ${GAMES[state.game].name} game on Playroom! Room code: ${state.token}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Playroom', text, url: link }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text}
+${link}`)}`, '_blank', 'noopener');
+  };
 
   return (
     <motion.div className="lobby" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
@@ -109,9 +129,9 @@ function Lobby({ state, practice }) {
             ))}
           </button>
           <span className="code-hint"><Icon name="copy" size={14} /> Tap the code to copy it</span>
-          <p className="muted">Friends open Playroom, tap <b>Join a game</b>, and enter this code with their name. Or send them the link: it fills the code in for them.</p>
+          <p className="muted">Friends open Playroom, tap <b>Join a game</b>, and enter this code with their name. Or tap Share link to send it on WhatsApp: it fills the code in for them.</p>
           <div className="code-actions">
-            <button className="btn btn-primary" onClick={() => copy(link, 'Invite link copied. Paste it to your friends.', state.token)}><Icon name="link" size={18} /> Copy link</button>
+            <button className="btn btn-primary" onClick={shareLink}><Icon name="share" size={18} /> Share link</button>
             <button className="btn btn-secondary" onClick={() => copy(state.token, `Code ${state.token} copied.`, state.token)}><Icon name="copy" size={18} /> Copy code</button>
           </div>
         </section>
@@ -152,6 +172,37 @@ function Lobby({ state, practice }) {
 }
 
 /* ---------- game ---------- */
+// Turn vibration on/off, shown in the in-game help sheet and the account sheet.
+export function VibrateSwitch() {
+  const [on, setOn] = useState(vibrateOn());
+  useEffect(() => onVibrate(setOn), []);
+  return (
+    <div className="setting-row sound-row">
+      <div className="setting-label"><b>Vibrate on my turn</b><span>A short buzz when it’s your move. No sounds.</span></div>
+      <button type="button" role="switch" aria-checked={on} className={`switch${on ? ' on' : ''}`} onClick={() => setVibrate(!on)}><span /></button>
+    </div>
+  );
+}
+
+// 3, 2, 1, GO! when a game (or a rematch) starts.
+function Countdown({ onDone }) {
+  const [step, setStep] = useState(3);
+  useEffect(() => {
+    const t = setTimeout(() => (step > 0 ? setStep(step - 1) : onDone()), step > 0 ? 620 : 520);
+    return () => clearTimeout(t);
+  }, [step]);
+  return (
+    <motion.div className="countdown" role="status" aria-live="assertive" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.25 } }}>
+      <AnimatePresence mode="popLayout">
+        <motion.span key={step} className={step ? 'cd-num' : 'cd-go'} initial={{ scale: 2.4, opacity: 0, rotate: -8 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.4, opacity: 0 }} transition={{ type: 'spring', stiffness: 420, damping: 22 }}>
+          {step || 'GO!'}
+        </motion.span>
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 function Game({ state, send, offset, error, practice }) {
   const now = useNow(offset, 100);
   const Board = BOARDS[state.game];
@@ -162,6 +213,27 @@ function Game({ state, send, offset, error, practice }) {
     return Math.max(0, Math.min(1, (g.deadline - now) / (g.turnMs || TURN_MS)));
   };
   const latest = state.events[state.events.length - 1];
+
+  // game start countdown (first start and every rematch)
+  const [counting, setCounting] = useState(false);
+  const started = useRef(null);
+  useEffect(() => {
+    if (state.status !== 'playing') return;
+    const key = state.match || 0;
+    if (started.current === key) return;
+    started.current = key;
+    setCounting(true);
+  }, [state.status, state.match]);
+
+  // your turn: a short vibration and a glow round the screen (no sounds)
+  const myTurn = state.status === 'playing' && !!me && me.alive && g.turn === state.you && g.phase !== 'roundover' && g.phase !== 'reveal';
+  const [spot, setSpot] = useState(0);
+  const wasMine = useRef(false);
+  useEffect(() => {
+    if (myTurn && !wasMine.current) { buzz([220, 90, 220]); setSpot(n => n + 1); }
+    wasMine.current = myTurn;
+  }, [myTurn, g.deadline]);
+  const left = myTurn && g.deadline ? Math.ceil((g.deadline - now) / 1000) : 99;
 
   return (
     <motion.div className="game" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -182,6 +254,9 @@ function Game({ state, send, offset, error, practice }) {
         <div className="banner banner-danger" role="status"><Icon name="flag" size={18} /> You’re out: you {me.reason}. You can keep watching.</div>
       )}
       <Board state={state} send={send} now={now} error={error} />
+      <AnimatePresence>{counting && <Countdown key="cd" onDone={() => setCounting(false)} />}</AnimatePresence>
+      <AnimatePresence>{spot > 0 && myTurn && <motion.div key={'spot' + spot} className={`spotlight${left <= 5 ? ' urgent' : ''}`} aria-hidden="true"
+        initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0.55] }} exit={{ opacity: 0 }} transition={{ duration: 0.9 }} />}</AnimatePresence>
       <AnimatePresence>{state.status === 'over' && <Result key={'r' + (state.match || 0)} state={state} send={send} practice={practice} />}</AnimatePresence>
       {state.status === 'over' && <RematchRequest state={state} send={send} />}
     </motion.div>
@@ -220,6 +295,28 @@ function RematchRequest({ state, send }) {
   );
 }
 
+// "Share my win": a ready-made image for WhatsApp / Instagram.
+function ShareWin({ state, totals, wins, isWin }) {
+  const [busy, setBusy] = useState(false);
+  const g = GAMES[state.game];
+  const me = state.players.find(p => p.id === state.you);
+  async function share() {
+    setBusy(true);
+    try {
+      const order = [...state.players].sort((a, b) => isWin(b) - isWin(a));
+      const players = order.map(p => ({
+        name: p.id === state.you ? `${p.name} (me)` : p.name, win: isWin(p),
+        note: totals ? `${totals[p.id]} pts` : wins ? `${wins[p.id] || 0}${state.game === 'wordchain' ? ' pts' : ' wins'}` : isWin(p) ? 'Winner' : '',
+      }));
+      const blob = await drawWinCard({ title: 'Victory', game: g.name, line: `${me ? me.name : 'I'} won at ${g.name}! ${state.result.text}.`, players, site: location.host });
+      const how = await shareWinCard(blob, `I just won ${g.name} on Playroom! Play with me:`, location.origin);
+      if (how === 'downloaded') toast('Win card saved. Post it anywhere.');
+    } catch { toast('Couldn’t make the win card on this phone.'); }
+    setBusy(false);
+  }
+  return <button className="btn btn-primary btn-block share-win" onClick={share} disabled={busy}><Icon name="share" size={18} /> {busy ? 'Making your card…' : 'Share my win'}</button>;
+}
+
 function Result({ state, send, practice }) {
   const w = state.result.winner;
   const team = state.result.winners || null; // team games (Imposter): several winners
@@ -227,6 +324,9 @@ function Result({ state, send, practice }) {
   const winner = state.players.find(p => p.id === w);
   const [busy, setBusy] = useState(false);
   const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    if (!practice) window.dispatchEvent(new Event('playroom:me'));
+  }, []);
   const g = state.g || {};
   const totals = state.game === 'cards' ? g.totals : null;
   const wins = state.game === 'xo' && (g.bestOf || 1) > 1 ? g.wins : state.game === 'wordchain' ? g.scores : null;
@@ -256,9 +356,14 @@ function Result({ state, send, practice }) {
       {won && <Confetti />}
       <motion.div className="dialog result" role="dialog" aria-modal="true" aria-label="Game over"
         initial={{ scale: 0.92, y: 20, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 320, damping: 26, delay: 0.2 }}>
+        <motion.div className={`vic${won ? ' won' : ''}`} initial={{ scale: 1.8, opacity: 0, letterSpacing: '0.4em' }}
+          animate={{ scale: 1, opacity: 1, letterSpacing: '0.04em' }} transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.25 }}>
+          {won ? 'Victory' : team || w ? 'Game over' : 'Draw'}
+        </motion.div>
         <div className={`result-icon${won ? ' won' : ''}`}><Icon name="trophy" size={30} /></div>
         <h2 className="h-page">{team ? `${state.result.title}${won ? ': you win' : ''}` : won ? 'You win' : winner ? `${winner.name} wins` : 'It’s a draw'}</h2>
         <p className="muted">{state.result.text}.</p>
+        {!practice && won && <motion.span className="xp-chip" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.7 }}>+1 win on the ranking</motion.span>}
         <ol className="standings">
           {standings.map((p, i) => (
             <li key={p.id} className={isWin(p) ? 'first' : ''}>
@@ -282,6 +387,7 @@ function Result({ state, send, practice }) {
               : keen.length ? `Rematch · ${names(keen)} ${keen.length > 1 ? 'are' : 'is'} in` : 'Rematch'}
           </motion.button>
         )}
+        {won && <ShareWin state={state} totals={totals} wins={wins} isWin={isWin} />}
         <div className="row stretch">
           <button className="btn btn-secondary" onClick={() => setHidden(true)}><Icon name="eye" size={18} /> View table</button>
           {!practice && !DEMO && <button className="btn btn-secondary" onClick={newRoom} disabled={busy}>New room</button>}

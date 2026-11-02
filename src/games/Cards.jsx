@@ -6,40 +6,65 @@ import { PlayingCard, CardBack, cardLabel } from '../components/PlayingCard.jsx'
 import { Icon } from '../components/Icon.jsx';
 import { Avatar } from '../components/Avatar.jsx';
 
-// Phones get the card table in landscape, like a real card-room app. In portrait we ask
-// them to turn the phone (and offer full screen + orientation lock where the browser
-// allows it, which is Android Chrome; iPhones just need rotation lock off).
+// Phones get the card table in landscape, like a real card-room app. The player's choice
+// (landscape / upright) is remembered. Landscape works two ways:
+//  - the phone is really sideways (or Android full screen locked it sideways), or
+//  - "table mode": we turn the whole app 90° with CSS, so it works even with rotation lock on
+//    and keeps working after switching apps (full screen and orientation locks are lost then).
+// <html> gets `land` whenever the landscape table layout applies, and `force-land` for table mode.
 const isPhone = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
-const PORTRAIT_OK = 'playroom-portrait-ok';
-function useOrientation() {
-  const q = typeof matchMedia === 'function' ? matchMedia('(orientation: portrait)') : null;
-  const [portrait, setPortrait] = useState(() => !!(q && q.matches));
+const PREF = 'playroom-cards-orient'; // 'land' | 'port'
+const readPref = () => { try { return localStorage.getItem(PREF); } catch { return null; } };
+const writePref = v => { try { localStorage.setItem(PREF, v); } catch {} };
+function useMedia(query) {
+  const q = typeof matchMedia === 'function' ? matchMedia(query) : null;
+  const [on, setOn] = useState(() => !!(q && q.matches));
   useEffect(() => {
     if (!q) return;
-    const f = () => setPortrait(q.matches);
+    const f = () => setOn(q.matches);
     q.addEventListener ? q.addEventListener('change', f) : q.addListener(f);
     return () => (q.removeEventListener ? q.removeEventListener('change', f) : q.removeListener(f));
-  }, []);
-  return portrait;
+  }, [query]);
+  return on;
 }
-const canLock = () => !!(document.documentElement.requestFullscreen && screen.orientation && screen.orientation.lock);
-async function goLandscape() {
+async function tryLockLandscape() {
   try {
-    if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-    await screen.orientation.lock('landscape');
-  } catch { /* not allowed here: the prompt stays, the player turns the phone by hand */ }
+    if (document.documentElement.requestFullscreen && !document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
+  } catch { /* not allowed (iPhone, desktop): table mode turns the app instead */ }
+}
+function unlock() {
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch {}
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch {}
+}
+function useCardTable(active) {
+  const phone = isPhone();
+  const portrait = useMedia('(orientation: portrait)');
+  const reallySideways = useMedia('(orientation: landscape) and (max-height: 520px)');
+  const [pref, setPref] = useState(readPref);
+  const forced = active && phone && pref === 'land' && portrait;
+  const land = active && (reallySideways || forced);
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.toggle('land', land);
+    html.classList.toggle('force-land', forced);
+    const size = () => { html.style.setProperty('--app-w', `${window.innerHeight}px`); html.style.setProperty('--app-h', `${window.innerWidth}px`); };
+    if (forced) { size(); window.addEventListener('resize', size); }
+    return () => { window.removeEventListener('resize', size); html.classList.remove('land', 'force-land'); };
+  }, [land, forced]);
+  const choose = v => { writePref(v); setPref(v); if (v === 'land') tryLockLandscape(); else unlock(); };
+  return { phone, portrait, pref, land, choose, ask: active && phone && portrait && !pref };
 }
 
-function RotatePrompt({ onDismiss }) {
+function RotatePrompt({ onLand, onUpright }) {
   return (
-    <motion.div className="rotate-prompt" role="dialog" aria-modal="true" aria-label="Turn your phone sideways"
+    <motion.div className="rotate-prompt" role="dialog" aria-modal="true" aria-label="Play in landscape?"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <div className="rotate-phone" aria-hidden="true"><span /></div>
-      <h2>Turn your phone sideways</h2>
-      <p>5 Cards plays on a full table in landscape, like a real card room.</p>
-      {canLock() && <button className="btn btn-primary" onClick={goLandscape}><Icon name="rotate" size={18} /> Play full screen</button>}
-      {!canLock() && <p className="rotate-small">If the screen doesn’t turn, switch off rotation lock.</p>}
-      <button className="btn btn-quiet" onClick={onDismiss}>Keep playing upright</button>
+      <h2>Play on the full table?</h2>
+      <p>5 Cards plays best sideways, like a real card room. You can switch any time with the rotate button.</p>
+      <button className="btn btn-primary" onClick={onLand}><Icon name="rotate" size={18} /> Play in landscape</button>
+      <button className="btn btn-quiet" onClick={onUpright}>Keep playing upright</button>
     </motion.div>
   );
 }
@@ -53,10 +78,7 @@ export function Cards({ state, send, now }) {
   const name = id => (id === state.you ? 'You' : (state.players.find(p => p.id === id) || {}).name || '');
 
   useEffect(() => { setSel([]); }, [g.turn, g.round, g.phase]);
-  const portrait = useOrientation();
-  const [upright, setUpright] = useState(() => { try { return sessionStorage.getItem(PORTRAIT_OK) === '1'; } catch { return false; } });
-  const askRotate = portrait && !upright && state.status === 'playing' && isPhone();
-  const keepUpright = () => { setUpright(true); try { sessionStorage.setItem(PORTRAIT_OK, '1'); } catch {} };
+  const table = useCardTable(state.status !== 'waiting');
   const progress = id => (g.turn === id && g.phase !== 'roundover' && state.status === 'playing'
     ? Math.max(0, Math.min(1, (g.deadline - now) / (g.turnMs || 30000))) : null);
   const selValid = useMemo(() => validDrop(sel), [sel]);
@@ -82,8 +104,14 @@ export function Cards({ state, send, now }) {
 
   return (
     <div className="fc">
-      <AnimatePresence>{askRotate && <RotatePrompt key="rotate" onDismiss={keepUpright} />}</AnimatePresence>
+      <AnimatePresence>{table.ask && state.status === 'playing' && <RotatePrompt key="rotate" onLand={() => table.choose('land')} onUpright={() => table.choose('port')} />}</AnimatePresence>
       <div className="fc-meta">
+        {table.phone && (
+          <button type="button" className="chip chip-btn" onClick={() => table.choose(table.land ? 'port' : 'land')}
+            aria-label={table.land ? 'Play upright' : 'Play in landscape'}>
+            <Icon name="rotate" size={14} /> {table.land ? 'Upright' : 'Landscape'}
+          </button>
+        )}
         <span className="chip"><Icon name="layers" size={14} /> Round {g.round}</span>
         <span className="chip">{g.decks} {g.decks > 1 ? 'decks' : 'deck'}</span>
         <span className="chip"><Icon name="flag" size={14} /> Exit at {g.threshold}</span>
@@ -98,6 +126,7 @@ export function Cards({ state, send, now }) {
                 {p.alive && g.counts && g.counts[p.id] !== undefined && p.id !== state.you && (
                   <span className="fc-count" aria-label={`${g.counts[p.id]} cards`}>
                     {Array.from({ length: Math.min(g.counts[p.id], 6) }, (_, k) => <i key={k} />)}
+                    <b>{g.counts[p.id]}</b>
                   </span>
                 )}
               </div>
@@ -158,7 +187,7 @@ export function Cards({ state, send, now }) {
         <section className="hand-area" aria-label="Your hand">
           <div className="hand-head">
             <span className="kicker">Your hand</span>
-            <span className="hand-points"><b>{g.myPoints}</b> {g.myPoints === 1 ? 'point' : 'points'}</span>
+            <span className="hand-points">{g.hand.length} {g.hand.length === 1 ? 'card' : 'cards'} · <b>{g.myPoints}</b> {g.myPoints === 1 ? 'point' : 'points'}</span>
           </div>
           <div className="hand">
             {g.hand.map((c, i) => {

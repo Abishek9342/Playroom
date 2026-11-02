@@ -7,6 +7,10 @@ import { Landing } from './screens/Landing.jsx';
 import { Home } from './screens/Home.jsx';
 import { RemoteRoom, PracticeRoom } from './screens/Room.jsx';
 import { PassPlay } from './screens/PassPlay.jsx';
+import { Admin } from './screens/Admin.jsx';
+import { Daily } from './screens/Daily.jsx';
+import { LevelUp } from './components/LevelUp.jsx';
+import { levelInfo } from '../shared/xp.js';
 import { Toaster } from './components/Toaster.jsx';
 import { Confirmer } from './components/Confirmer.jsx';
 import { InstallButton } from './components/InstallButton.jsx';
@@ -17,9 +21,11 @@ import { AccountSheet } from './components/AccountSheet.jsx';
 import { AUTH_MESSAGES } from './components/Google.jsx';
 
 const page = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.2, 0.8, 0.2, 1] } },
-  exit: { opacity: 0, y: -6, transition: { duration: 0.14 } },
+  initial: { opacity: 0, y: 18, scale: 0.97, filter: 'blur(6px)' },
+  // transitionEnd clears filter/transform, which would otherwise pin position:fixed children
+  // (overlays, voice dock, countdown) to the page instead of the screen
+  animate: { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', transition: { duration: 0.38, ease: [0.16, 1, 0.3, 1] }, transitionEnd: { filter: 'none', transform: 'none' } },
+  exit: { opacity: 0, y: -10, scale: 0.99, filter: 'blur(4px)', transition: { duration: 0.16 } },
 };
 
 // Routes: #room-CODE, #join-CODE (invite link), #practice,
@@ -42,6 +48,8 @@ function parse(hash) {
   }
   if (hash === '#practice') return { kind: 'practice-home', key: 'home' };
   if (hash === '#pass-imposter') return { kind: 'pass', key: 'pass' };
+  if (hash === '#admin' && !DEMO) return { kind: 'admin', key: 'admin' };
+  if (hash === '#daily' && !DEMO) return { kind: 'daily', key: 'daily' };
   return { kind: 'home', key: 'home' };
 }
 
@@ -53,6 +61,16 @@ export default function App() {
   const [hash, setHash] = useState(location.hash);
   const [config, setConfig] = useState({ google: false });
   const [account, setAccount] = useState(null); // null | 'open' | 'reset'
+  const [levelUp, setLevelUp] = useState(null);
+  // after games and the daily puzzle: reload XP/streak, celebrate a new level
+  const refreshMe = () => setTimeout(() => api('/api/me').then(u => {
+    setUser(old => {
+      if (old && levelInfo(u.xp).level > levelInfo(old.xp || 0).level) { setLevelUp(levelInfo(u.xp).level); }
+      return u;
+    });
+    remember(u);
+  }).catch(() => {}), 1200);
+  useEffect(() => { const f = () => refreshMe(); window.addEventListener('playroom:me', f); return () => window.removeEventListener('playroom:me', f); }, []);
 
   // Back from Google: the Worker lands us on #auth-<outcome>. Say what happened, then tidy the URL.
   useEffect(() => {
@@ -71,6 +89,12 @@ export default function App() {
     return () => window.removeEventListener('hashchange', check);
   }, []);
   useEffect(() => { if (!DEMO) api('/api/config').then(setConfig).catch(() => {}); }, []);
+  // time in app (admin stats): one ping a minute while the app is open and on screen
+  useEffect(() => {
+    if (DEMO || !user) return;
+    const t = setInterval(() => { if (!document.hidden) api('/api/ping', {}).catch(() => {}); }, 60000);
+    return () => clearInterval(t);
+  }, [user && user.id]);
   useEffect(() => {
     if (DEMO) return;
     api('/api/me').then(u => { remember(u); setUser(u); })
@@ -89,13 +113,15 @@ export default function App() {
   let screen, key = route.key;
   if (user === undefined) { key = 'loading'; screen = <div className="empty-state"><span className="spinner" aria-label="Loading" /></div>; }
   else if (route.kind === 'pass') screen = <PassPlay />;
+  else if (route.kind === 'admin' && user) screen = <Admin user={user} />;
+  else if (route.kind === 'daily' && user) screen = <Daily onXp={refreshMe} />;
   else if (route.kind === 'practice') screen = <PracticeRoom game={route.game} size={route.size} options={route.options} name={user ? user.name : 'You'} />;
   else if (route.kind === 'practice-home' || DEMO) screen = <Home user={user} />;
   else if (!user) { key = 'landing'; screen = <Landing config={config} onSignedIn={u => { remember(u); setUser(u); }} inviteToken={route.kind === 'join' ? route.token : null} />; }
   else if (route.kind === 'room' || route.kind === 'join') screen = <RemoteRoom token={route.token} />;
   else screen = <Home user={user} />;
 
-  const inRoom = route.kind === 'room' || route.kind === 'join' || route.kind === 'practice' || route.kind === 'pass';
+  const inRoom = route.kind === 'room' || route.kind === 'join' || route.kind === 'practice' || route.kind === 'pass' || route.kind === 'daily';
   return (
     <div className={`app${inRoom ? ' in-room' : ''}`}>
       {!inRoom && key !== 'landing' && (
@@ -104,9 +130,11 @@ export default function App() {
           <div className="topbar-right">
             {!DEMO && <InstallButton />}
             {user ? (
-              <button className="account" onClick={() => setAccount('open')} aria-label={`Signed in as ${user.name}. Account`}>
-                <span className="account-name">{user.name}</span><Icon name="user" size={18} />
-              </button>
+              <>
+                <button className="account" onClick={() => setAccount('open')} aria-label={`Signed in as ${user.name}. Account`}>
+                  <span className="account-name">{user.name}</span><Icon name="user" size={18} />
+                </button>
+              </>
             ) : !DEMO && <a className="btn btn-secondary btn-sm" href="#">Sign in</a>}
           </div>
         </header>
@@ -116,6 +144,7 @@ export default function App() {
       </AnimatePresence>
       <AccountSheet open={!!account && !!user} reset={account === 'reset'} onClose={() => setAccount(null)} user={user} config={config}
         onUser={u => { remember(u); setUser(u); }} onSignOut={signOut} />
+      <AnimatePresence>{levelUp && <LevelUp key="lu" level={levelUp} onDone={() => setLevelUp(null)} />}</AnimatePresence>
       <Toaster />
       <Confirmer />
     </div>

@@ -1,5 +1,107 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-11-02 5 Cards table mode: game-over card cut off — FIXED, DEPLOYED (version b7d867ad)
+- Cause: table mode rotates `.app`, but `.dialog/.sheet` used `max-height: calc(100vh - 32px)` = the
+  phone's LONG side, so the result card overflowed the turned screen (top + "Back to games" hidden).
+  Fix (end of styles.css): in `html.force-land` dialogs/sheets cap at `var(--app-h) - 24px` (scroll
+  inside); in `html.land` the result card is compact (no trophy icon, smaller title, tighter rows).
+- Checked: XO practice with table-mode classes forced, 390x844: card 355px tall inside a 390px
+  turned screen, all buttons visible; build, unit, ui-smoke pass; live CSS has the rule.
+- ADMIN_EMAILS moved from a wrangler.jsonc var to a Cloudflare **secret** (user approved; repo is
+  public). A secret can't share a name with a var, so: deployed without the var (4b909463), then
+  `wrangler secret put ADMIN_EMAILS`. Local dev reads it from `.dev.vars` (git-ignored).
+- Pushed everything since 087efa9 to GitHub (theme/admin/voice/XP/ranking/no-sound/fixes).
+
+## 2026-11-02 (latest) Stronger turn vibration; voice dock no longer covers controls — DEPLOYED (version b12ee5b5)
+- Turn vibration is now a double buzz [220, 90, 220] ms (was 60 ms). Browsers can't set vibration
+  strength, only length/pattern; iPhones ignore vibrate entirely.
+- Voice dock (fixed bottom-left) covered Patches "Submit solution" and the Word Chain input on short
+  phones. Removed the old rule that lifted the dock 170px in Word Chain; now `.app:has(.voice-dock)
+  .room` gets 92px bottom padding and the sticky `.composer` stops 86px up (reset in landscape).
+- Checked: overlap test at 390x700 and 390x844 for Patches, Word Chain, 5 Cards, XO, Imposter: none;
+  build, unit, ui-smoke pass. Deployed; live CSS/JS checked.
+
+## 2026-11-02 (later) No sounds, vibrate on your turn only; ranking in account — DEPLOYED (version 3ff7a442)
+- User: sounds were irritating. src/lib/sfx.js deleted; all play()/buzz calls removed. Only feedback is
+  a 60 ms vibration when your turn starts (src/lib/haptics.js, switch "Vibrate on my turn",
+  localStorage `playroom-vibrate`), in the game help sheet and the account sheet. Glow stays.
+- XP off the home page: PlayerCard removed (LevelUp moved to src/components/LevelUp.jsx and still
+  pops on a new level); top bar back to name + user icon (no LV chip). Result screen: "+1 win on the
+  ranking" on an online win, nothing else. Account sheet: level/XP/streak boxes, Daily puzzle
+  button, and the new **Ranking** (src/components/Ranking.jsx).
+- Ranking: GET /api/ranking[?game=key] (worker rankPlayers): registered users only, online games
+  from play_players. Order: wins, then win rate, then games played; full ties share a rank. Top 50
+  plus your own row. Tabs: All + each game. No migration needed.
+- Checked locally: build, unit, ui-smoke, e2e, xp-e2e pass; ranking API test (order, me row,
+  per-game filter, 400 on bad game); account/ranking screenshots. Deployed on the user's OK (no DB
+  change); live check: no XP on home, ranking + vibrate switch in account, no errors; test user deleted.
+
+## 2026-11-02 Motion + sound, XP/levels/streak/daily puzzle, reactions + win card — DEPLOYED
+- User rejected the Arcade Night recolour: **keep the live board-game colours**. styles.css was rebuilt
+  to match prod exactly (verified rule-by-rule against the live CSS), then the new features were
+  styled in board-game tokens (blocks at the END of styles.css: Motion pack / XP / Quick reactions).
+- A separate "Paper & Ink" restyle appeared locally (15:50-16:01, unknown session): undone per the
+  user. Backup of those files: session scratchpad `paper-ink-backup/` (temp, may be gone).
+- The 15 features: 3-2-1 countdown; your-turn glow + vibration; tick in the last 5 s; VICTORY screen;
+  sound effects + on/off switch (src/lib/sfx.js); smoother page transitions; XP after online games
+  (shared/xp.js); levels + LEVEL UP pop-up; home player card; LV chip in the top bar; daily streak +
+  best; daily Patches puzzle (#daily, /api/daily) with fastest-times board; quick reactions over
+  avatars (shared/reactions.js, `react` msg, 1.2 s rate limit); "Share my win" image (src/lib/winCard.js,
+  board-game style); voice dock shows immediately.
+- Small phones: Install app is icon-only and the account name is clipped so the LV chip fits.
+- Checked: build, unit tests, ui-smoke, e2e, imposter-e2e, xp-e2e (all pass); two-browser run
+  (countdown, glow, reaction, VICTORY +50 XP, player card), light + dark screenshots, win card render.
+- DEPLOYED 2026-11-02 (version 570ad284) after `npm run db:xp:remote` (0005). Live checks: xp-e2e 10/10,
+  two-browser run (countdown, glow, reaction, VICTORY +50 XP, player card), no errors; the 4 test
+  accounts deleted from the live DB. Not pushed to GitHub
+  (still at 087efa9). OPEN: TURN key secrets, rotate Google client secret.
+
+## 2026-11-02 Voice chat (PUBG-style mic) — DEPLOYED (STUN-only until the TURN key is added)
+- WebRTC mesh, audio phone-to-phone. src/lib/voice.js (VoiceMesh: smaller id offers, ICE queueing,
+  level meters for the talking ring, relay-bytes reporting each minute), src/components/VoiceDock.jsx
+  (dock: mic / speaker / people; sheet: Hold-to-talk switch, per-player Mute, Leave voice;
+  VoiceContext -> Avatar `is-talking` ring + mic badge). Online rooms only (not practice), lobby too.
+- Signalling over the room WebSocket: DO forwards `{type:'rtc', to, data}` only between players in
+  that room (20 KB max); `{type:'voice', on}` -> RoomCore.setVoice -> players[].voice. useRemoteRoom
+  exposes subscribeRtc. Mic starts OFF; tapping turns open mic on; Hold to talk = push-to-talk.
+- Relay: Cloudflare Realtime TURN, free 1,000 GB/month then $0.05/GB. `/api/voice/ice` gives STUN
+  always and TURN creds (generate-ice-servers, ttl 4 h, port-53 URLs filtered) only while this
+  month's relay use < **950 GB** (user's cap; decimal GB). `/api/voice/usage` adds relay bytes (clamped
+  30 MB per report) into `voice_usage` (month 'YYYY-MM' UTC). At the cap: relay stops, direct voice
+  keeps working, auto-resumes next month. Admin panel shows "Voice relay this month".
+- Needs secrets TURN_KEY_ID + TURN_KEY_API_TOKEN (Cloudflare dashboard -> Realtime -> TURN) or it runs
+  STUN-only. Migration: migrations/0004_voice.sql (`npm run db:voice:remote`, IF NOT EXISTS, safe).
+- Mic needs https (live site) or localhost; not the LAN http URL. Phones pause the mic in background.
+- Tests: two Edge browsers with fake mics: connected, remote audio live, talking rings both ways,
+  mute works, no errors. Cap test: under cap -> TURN requested; 99 GB fake report ignored; at 950 GB
+  -> resting; reset -> back on. All suites pass.
+- Deployed after `npm run db:voice:remote`; live two-browser voice test passed; its 2 test accounts
+  deleted. OPEN: TURN key secrets (optional), push theme/admin/voice to GitHub.
+
+## 2026-11-02 Board-game theme, admin panel, 5 Cards rotation, Share link (DEPLOYED, not on GitHub yet)
+- **Theme** (user chose "board-game box"): sunny yellow table with dot texture, royal blue `--brand`,
+  tomato `--cta` for primary buttons, ink `--outline` 2.5px borders, hard offset shadows (`--shadow-*`),
+  Lilita One display face (`--display`) + Manrope, sticker badges/chips, tilted game boxes with per-game
+  colours (`GAME_COLORS` in meta.js), floating capsule top bar. Dark = deep indigo. Component layer is
+  the "Board-game box theme" block at the END of styles.css (wins over older rules).
+- **5 Cards rotation**: choice remembered in localStorage `playroom-cards-orient` (land|port). Rotate chip
+  in the game. Landscape = phone sideways OR "table mode": `html.force-land` turns the whole `.app` 90°
+  (works with rotation lock, survives app switching). All landscape CSS is `html.land …` (class set by
+  `useCardTable` in Cards.jsx). Gotcha fixed: `.app { min-height: 100vh }` broke the rotation, needs
+  `min-height: 0`. Portrait: seats with card counts (number) on the felt; room's player strip hidden.
+- **Share link** replaces Copy link: navigator.share sheet, else wa.me (WhatsApp).
+- **Admin**: admin = Google-verified email in wrangler.jsonc `vars.ADMIN_EMAILS`
+  (the admin Gmail in the ADMIN_EMAILS secret). `/api/admin/overview|users|password`; `/api/ping` each minute
+  while visible -> users.active_ms/last_seen. Each finished online game -> `plays` + `play_players`
+  (written by the Durable Object, RoomCore.summary()). Practice games aren't recorded. Admin panel at
+  #admin, linked from the account sheet only (top-bar button removed at the user's request: "one admin").
+- Live DB migrated with migrations/0003_admin.sql (`npm run db:admin:remote`). Fresh DBs: schema.sql.
+- Checked: unit, ui-smoke, e2e, imposter e2e (local + live), admin API (admin flag, overview, add player,
+  reset password + login with it, non-admin 403, ping), light/dark screenshots of landing, home, sheet,
+  lobby, cards, word chain, admin; rotation test (prompt, table mode, tap mapping, reload keeps it).
+  Live: game recorded into plays; test game + accounts deleted afterwards.
+- OPEN: the admin must sign in with Google as the admin Gmail in the ADMIN_EMAILS secret once. Push to GitHub.
+
 ## 2026-11-02 NEW GAME: Imposter (like imposter.app) — built + tested locally, NOT DEPLOYED yet
 - User choices: typed one-word clues (online rooms), a one-phone pass-and-play mode, one round per
   game (Rematch = new word + new Imposter).

@@ -12,6 +12,9 @@ export { OPTIONS, defaultOptions };
 
 // Muted, readable avatar tones (dark text sits on all of them).
 const TONES = ['#A7D3C0', '#F0CF8E', '#B7C8F0', '#F2B8B0', '#CDBDEB', '#F5C29B', '#A9DCE8', '#D6DE9C', '#E9B6D2', '#BFD8A6'];
+// Each game's box colour (board-game theme), used behind its artwork.
+export const GAME_COLORS = { wordchain: '#4C7BF4', xo: '#F0473A', patches: '#27B079', imposter: '#9B6BF2', cards: '#FF9F1C' };
+
 export function colorFor(id = '') {
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;

@@ -1,5 +1,6 @@
 import { RoomCore } from '../shared/roomCore.js';
 import { getDictionary } from './dictionary.js';
+import { xpForGame, nextStreak, dayKey } from '../shared/xp.js';
 
 const ROOM_TTL_MS = 3 * 3600e3;   // unused rooms are wiped after 3 hours
 const AFTER_GAME_MS = 15 * 60e3;  // finished rooms are wiped after 15 minutes
@@ -28,9 +29,36 @@ export class GameRoom {
     this.core = new RoomCore(cfg, {
       isWord,
       onChange: () => this.broadcast(),
-      onFinish: () => this.state.storage.setAlarm(Date.now() + AFTER_GAME_MS).catch(() => {}),
+      onFinish: summary => {
+        this.state.storage.setAlarm(Date.now() + AFTER_GAME_MS).catch(() => {});
+        this.state.waitUntil ? this.state.waitUntil(this.record(summary)) : this.record(summary);
+      },
       onRestart: () => this.state.storage.setAlarm(Date.now() + ROOM_TTL_MS).catch(() => {}),
     });
+  }
+
+  // One row per finished game, one per player in it (playtime, moves, won). Stats only, so a
+  // failure here never affects the game.
+  async record(s) {
+    if (!s || !this.env.DB || !s.players.length) return;
+    try {
+      const id = crypto.randomUUID();
+      await this.env.DB.batch([
+        this.env.DB.prepare('INSERT INTO plays (id, game, room, started_at, ended_at, players, outcome) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .bind(id, s.game, s.room, s.startedAt, s.endedAt, s.players.length, s.outcome.slice(0, 80)),
+        ...s.players.map(p => this.env.DB.prepare('INSERT INTO play_players (play_id, user_id, ms, moves, won) VALUES (?, ?, ?, ?, ?)')
+          .bind(id, p.id, p.ms, p.moves, p.won ? 1 : 0)),
+      ]);
+      // XP and streaks for everyone who played
+      const today = dayKey(s.endedAt);
+      for (const p of s.players) {
+        const u = await this.env.DB.prepare('SELECT streak, best_streak, streak_day FROM users WHERE id = ?').bind(p.id).first();
+        if (!u) continue;
+        const st = nextStreak({ streak: u.streak, best: u.best_streak, day: u.streak_day }, today);
+        await this.env.DB.prepare('UPDATE users SET xp = xp + ?, streak = ?, best_streak = ?, streak_day = ? WHERE id = ?')
+          .bind(xpForGame(p), st.streak, st.best, st.day, p.id).run();
+      }
+    } catch (e) { console.error('stats', e); }
   }
 
   async fetch(req) {
@@ -101,6 +129,25 @@ export class GameRoom {
         break;
       }
       case 'rematch-decline': c.declineRematch(uid); break;
+      case 'voice': c.setVoice(uid, !!msg.on); break;
+      case 'react': {
+        const r = Number(msg.r);
+        if (!Number.isInteger(r) || r < 0 || r > 7 || !c.find(uid)) break;
+        this.lastReact = this.lastReact || new Map();
+        if (Date.now() - (this.lastReact.get(uid) || 0) < 1200) break;
+        this.lastReact.set(uid, Date.now());
+        const out = JSON.stringify({ type: 'react', from: uid, r });
+        for (const sock of this.conns.keys()) { try { sock.send(out); } catch {} }
+        break;
+      }
+      case 'rtc': {
+        // WebRTC setup (offer/answer/ICE) for voice chat, only between players in this room
+        if (typeof msg.to !== 'string' || !c.find(msg.to) || !c.find(uid)) break;
+        const out = JSON.stringify({ type: 'rtc', from: uid, data: msg.data });
+        if (out.length > 20000) break;
+        for (const [sock, id] of this.conns) if (id === msg.to) { try { sock.send(out); } catch {} }
+        break;
+      }
       case 'move': {
         const err = c.move(uid, msg.move);
         if (err) try { ws.send(JSON.stringify({ type: 'error', message: err })); } catch {}

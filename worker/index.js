@@ -1,5 +1,7 @@
 import { GAMES, normalizeOptions } from '../shared/games.js';
 import { googleProfile, usernameBase } from './google.js';
+import { genPatches, checkPatches } from '../shared/games.js';
+import { XP, nextStreak, liveStreak, dayKey, seeded } from '../shared/xp.js';
 export { GameRoom } from './room.js';
 
 const SESSION_DAYS = 30;
@@ -51,18 +53,24 @@ async function currentSession(req, env) {
   const tokenHash = await sha256(t);
   const row = await env.DB.prepare(
     `SELECT u.id, u.username, u.display_name, u.is_guest, u.email, u.google_sub, u.pass_hash <> '' AS has_password,
-            s.via, s.created_at AS session_created
+            u.xp, u.streak, u.best_streak, u.streak_day, s.via, s.created_at AS session_created
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`
   ).bind(tokenHash, Date.now()).first();
-  return row ? { user: publicUser(row), row, tokenHash } : null;
+  return row ? { user: publicUser(row, env), row, tokenHash } : null;
 }
 
+// Admin = signed in through Google with an email listed in ADMIN_EMAILS (Google verified it).
+const adminEmails = env => String(env.ADMIN_EMAILS || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+const isAdmin = (row, env) => !!(env && row && row.google_sub && row.email && adminEmails(env).includes(String(row.email).toLowerCase()));
+
 // What the app sees about a user.
-function publicUser(row) {
+function publicUser(row, env) {
   if (!row) return null;
   return {
     id: row.id, username: row.username, name: row.display_name || row.username, guest: !!row.is_guest,
     google: row.google_sub ? (row.email || 'Google account') : null, hasPassword: !!row.has_password,
+    admin: isAdmin(row, env),
+    xp: row.xp || 0, streak: liveStreak({ streak: row.streak || 0, day: row.streak_day || null }), bestStreak: row.best_streak || 0,
   };
 }
 
@@ -183,6 +191,110 @@ function badOrigin(req, url) {
   return !allowed.includes(host);
 }
 
+// Voice chat relay (Cloudflare TURN). Free up to 1,000 GB a month; we stop handing out relay
+// access at VOICE_CAP_BYTES (950 GB, decimal, so a little under Cloudflare's meter) and it comes
+// back on its own when the month changes. Direct phone-to-phone voice keeps working regardless.
+const VOICE_CAP_BYTES = 950e9;
+const monthKey = () => new Date().toISOString().slice(0, 7);
+async function voiceUsed(env) {
+  const r = await env.DB.prepare('SELECT bytes FROM voice_usage WHERE month = ?').bind(monthKey()).first().catch(() => null);
+  return r ? r.bytes : 0;
+}
+const STUN = { urls: ['stun:stun.cloudflare.com:3478'] };
+async function voiceIce(env) {
+  const configured = !!(env.TURN_KEY_ID && env.TURN_KEY_API_TOKEN);
+  const used = await voiceUsed(env);
+  const resting = configured && used >= VOICE_CAP_BYTES;
+  if (!configured || resting) return { iceServers: [STUN], relay: false, resting };
+  try {
+    const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${env.TURN_KEY_ID}/credentials/generate-ice-servers`, {
+      method: 'POST', headers: { authorization: `Bearer ${env.TURN_KEY_API_TOKEN}`, 'content-type': 'application/json' }, body: JSON.stringify({ ttl: 4 * 3600 }),
+    });
+    const data = await r.json();
+    const list = (Array.isArray(data.iceServers) ? data.iceServers : [data.iceServers]).filter(Boolean)
+      // port 53 is blocked by browsers and only slows the connection down
+      .map(s => ({ ...s, urls: (Array.isArray(s.urls) ? s.urls : [s.urls]).filter(u => !/:53\b/.test(u)) }))
+      .filter(s => s.urls.length);
+    return { iceServers: list.length ? list : [STUN], relay: list.some(s => s.username), resting: false };
+  } catch { return { iceServers: [STUN], relay: false, resting: false }; }
+}
+
+// Today's fastest daily-puzzle times (top 10) and your place.
+async function dailyBoard(env, day, me) {
+  const r = await env.DB.prepare(`SELECT d.user_id, u.display_name, u.username, d.solved_at - d.started_at AS ms FROM daily_runs d JOIN users u ON u.id = d.user_id
+                                  WHERE d.day = ? AND d.solved_at IS NOT NULL ORDER BY ms ASC LIMIT 50`).bind(day).all();
+  const all = r.results.map((x, i) => ({ rank: i + 1, name: x.display_name || x.username, ms: x.ms, me: x.user_id === me }));
+  return { top: all.slice(0, 10), mine: all.find(x => x.me) || null, solvers: all.length };
+}
+
+// Admin panel API. Caller is already checked to be an admin.
+async function handleAdmin(req, env, path) {
+  if (path === '/api/admin/overview' && req.method === 'GET') {
+    const weekAgo = Date.now() - 7 * 864e5;
+    const [counts, playsRow, games, users, favs] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) AS total, COALESCE(SUM(is_guest), 0) AS guests, COALESCE(SUM(active_ms), 0) AS active_ms, COALESCE(SUM(created_at > ? AND is_guest = 0), 0) AS new_week FROM users').bind(weekAgo).first(),
+      env.DB.prepare('SELECT COUNT(*) AS plays, COALESCE(SUM(ended_at - started_at), 0) AS ms FROM plays').first(),
+      env.DB.prepare(`SELECT p.game, COUNT(DISTINCT p.id) AS plays, COUNT(pp.user_id) AS seats, COALESCE(SUM(pp.ms), 0) AS ms
+                      FROM plays p LEFT JOIN play_players pp ON pp.play_id = p.id GROUP BY p.game ORDER BY plays DESC`).all(),
+      env.DB.prepare(`SELECT u.id, u.username, u.display_name, u.is_guest, u.email, u.google_sub, u.created_at, u.last_seen, u.active_ms, u.xp, u.streak, u.streak_day,
+                             u.pass_hash <> '' AS has_password, COALESCE(s.plays, 0) AS plays, COALESCE(s.ms, 0) AS play_ms,
+                             COALESCE(s.moves, 0) AS moves, COALESCE(s.wins, 0) AS wins
+                      FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS plays, SUM(ms) AS ms, SUM(moves) AS moves, SUM(won) AS wins
+                                              FROM play_players GROUP BY user_id) s ON s.user_id = u.id
+                      ORDER BY u.created_at DESC LIMIT 1000`).all(),
+      env.DB.prepare(`SELECT pp.user_id, p.game, COUNT(*) AS n FROM play_players pp JOIN plays p ON p.id = pp.play_id
+                      GROUP BY pp.user_id, p.game`).all(),
+    ]);
+    const fav = {};
+    for (const r of favs.results) if (!fav[r.user_id] || r.n > fav[r.user_id].n) fav[r.user_id] = r;
+    const playMs = users.results.reduce((t, u) => t + u.play_ms, 0);
+    const voiceBytes = await voiceUsed(env);
+    return json({
+      voice: { month: monthKey(), bytes: voiceBytes, cap: VOICE_CAP_BYTES, relay: !!(env.TURN_KEY_ID && env.TURN_KEY_API_TOKEN) },
+      totals: { users: counts.total, guests: counts.guests, accounts: counts.total - counts.guests, newWeek: counts.new_week,
+        plays: playsRow.plays, gameMs: playsRow.ms, playMs, activeMs: counts.active_ms },
+      games: games.results,
+      users: users.results.map(u => ({
+        id: u.id, username: u.is_guest ? null : u.username, name: u.display_name || u.username, guest: !!u.is_guest,
+        google: u.google_sub ? u.email : null, hasPassword: !!u.has_password, created: u.created_at, lastSeen: u.last_seen,
+        activeMs: u.active_ms, playMs: u.play_ms, xp: u.xp || 0, streak: liveStreak({ streak: u.streak || 0, day: u.streak_day || null }), plays: u.plays, moves: u.moves, wins: u.wins, favGame: fav[u.id] ? fav[u.id].game : null,
+      })),
+    });
+  }
+
+  // Add a player: a normal account with a username and password the admin hands over.
+  if (path === '/api/admin/users' && req.method === 'POST') {
+    const { username = '', password = '', name = '' } = await readBody(req);
+    const uname = String(username).trim();
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(uname)) return json({ error: 'Usernames are 3–20 letters, numbers or underscores.' }, 400);
+    if (String(password).length < 8) return json({ error: 'Passwords need at least 8 characters.' }, 400);
+    const display = String(name).trim().replace(/\s+/g, ' ').slice(0, 20) || uname;
+    if (await env.DB.prepare('SELECT 1 FROM users WHERE username = ?').bind(uname).first()) return json({ error: 'That username is taken.' }, 409);
+    const id = crypto.randomUUID();
+    const salt = randomHex(16);
+    await env.DB.prepare('INSERT INTO users (id, username, display_name, pass_hash, salt, is_guest, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)')
+      .bind(id, uname, display, await hashPassword(String(password), salt), salt, Date.now()).run();
+    return json({ id, username: uname, name: display }, 201);
+  }
+
+  // Reset a player's password; they're signed out everywhere and use the new one next time.
+  if (path === '/api/admin/password' && req.method === 'POST') {
+    const { userId = '', password = '' } = await readBody(req);
+    if (String(password).length < 8) return json({ error: 'Passwords need at least 8 characters.' }, 400);
+    const target = await env.DB.prepare('SELECT id, is_guest, username FROM users WHERE id = ?').bind(String(userId)).first();
+    if (!target) return json({ error: 'No such player.' }, 404);
+    if (target.is_guest) return json({ error: 'Guests don’t have passwords.' }, 400);
+    const salt = randomHex(16);
+    await env.DB.batch([
+      env.DB.prepare('UPDATE users SET pass_hash = ?, salt = ? WHERE id = ?').bind(await hashPassword(String(password), salt), salt, target.id),
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
+    ]);
+    return json({ ok: true, username: target.username });
+  }
+
+  return json({ error: 'Not found.' }, 404);
+}
+
 async function handleApi(req, env, url) {
   const path = url.pathname;
   const unsafe = req.method !== 'GET' || req.headers.get('upgrade') === 'websocket';
@@ -223,14 +335,14 @@ async function handleApi(req, env, url) {
 
   if (path === '/api/login' && req.method === 'POST') {
     const { username = '', password = '' } = await readBody(req);
-    const row = await env.DB.prepare(`SELECT id, username, display_name, is_guest, pass_hash, salt, email, google_sub, pass_hash <> '' AS has_password FROM users WHERE username = ? AND is_guest = 0`)
+    const row = await env.DB.prepare(`SELECT id, username, display_name, is_guest, pass_hash, salt, email, google_sub, pass_hash <> '' AS has_password, xp, streak, best_streak, streak_day FROM users WHERE username = ? AND is_guest = 0`)
       .bind(String(username).trim()).first();
     const ok = row && row.pass_hash && sameString(await hashPassword(String(password), row.salt), row.pass_hash);
     if (!ok) {
       if (row && !row.pass_hash && row.google_sub) return json({ error: 'This account signs in with Google. Use Continue with Google.' }, 401);
       return json({ error: 'Wrong username or password.' }, 401);
     }
-    return json(publicUser(row), 200, { 'set-cookie': await createSession(env, row.id, url) });
+    return json(publicUser(row, env), 200, { 'set-cookie': await createSession(env, row.id, url) });
   }
 
   if (path === '/api/logout' && req.method === 'POST') {
@@ -244,6 +356,7 @@ async function handleApi(req, env, url) {
 
   if (path === '/api/me') {
     if (!user) return json({ error: 'Not signed in.' }, 401);
+    await env.DB.prepare('UPDATE users SET last_seen = ? WHERE id = ?').bind(Date.now(), user.id).run();
     const r = session.row;
     return json({ ...user, resetUntil: r.via === 'google' ? (r.session_created || 0) + RESET_WINDOW_MS : 0 });
   }
@@ -260,6 +373,77 @@ async function handleApi(req, env, url) {
     return json({ ok: true }, 200, { 'set-cookie': linkCookie(url, `${exp}.${await hmac(env, `link.${session.tokenHash}.${exp}`)}`) });
   }
   if (!user) return json({ error: 'Sign in first.' }, 401);
+
+  // Time in the app: the app pings once a minute while it's open and on screen. Pings closer
+  // together than 50 s (a second tab) don't add time.
+  if (path === '/api/ping' && req.method === 'POST') {
+    const now = Date.now();
+    await env.DB.prepare('UPDATE users SET active_ms = active_ms + CASE WHEN last_seen IS NULL OR ? - last_seen > 50000 THEN 60000 ELSE 0 END, last_seen = ? WHERE id = ?')
+      .bind(now, now, user.id).run();
+    return json({ ok: true });
+  }
+
+  /* ----- ranking: registered players by games won (online games only) ----- */
+  if (path === '/api/ranking' && req.method === 'GET') {
+    const game = url.searchParams.get('game') || '';
+    if (game && !GAMES[game]) return json({ error: 'Unknown game.' }, 400);
+    const { results } = await env.DB.prepare(
+      `SELECT u.id, u.display_name AS name, COUNT(*) AS played, SUM(pp.won) AS wins
+       FROM play_players pp JOIN plays p ON p.id = pp.play_id JOIN users u ON u.id = pp.user_id
+       WHERE u.is_guest = 0 AND (? = '' OR p.game = ?)
+       GROUP BY u.id`).bind(game, game).all();
+    return json(rankPlayers(results, user.id));
+  }
+
+  /* ----- daily puzzle: the same 6x6 Patches grid for everyone today (India time) ----- */
+  if (path === '/api/daily' && req.method === 'GET') {
+    const day = dayKey();
+    const puzzle = genPatches(6, seeded('playroom-daily-' + day));
+    await env.DB.prepare('INSERT OR IGNORE INTO daily_runs (user_id, day, started_at) VALUES (?, ?, ?)').bind(user.id, day, Date.now()).run();
+    const run = await env.DB.prepare('SELECT started_at, solved_at FROM daily_runs WHERE user_id = ? AND day = ?').bind(user.id, day).first();
+    return json({ day, n: puzzle.n, clues: puzzle.clues, startedAt: run.started_at, solvedAt: run.solved_at, now: Date.now(), board: await dailyBoard(env, day, user.id) });
+  }
+  if (path === '/api/daily/solve' && req.method === 'POST') {
+    const day = dayKey();
+    const puzzle = genPatches(6, seeded('playroom-daily-' + day));
+    const { rects } = await readBody(req);
+    const err = checkPatches(puzzle.n, puzzle.clues, rects);
+    if (err) return json({ error: 'Not quite: ' + err }, 400);
+    const run = await env.DB.prepare('SELECT started_at, solved_at FROM daily_runs WHERE user_id = ? AND day = ?').bind(user.id, day).first();
+    if (!run) return json({ error: 'Open today’s puzzle first.' }, 400);
+    let xpGain = 0;
+    if (!run.solved_at) {
+      const now = Date.now();
+      const u = await env.DB.prepare('SELECT streak, best_streak, streak_day FROM users WHERE id = ?').bind(user.id).first();
+      const st = nextStreak({ streak: u.streak, best: u.best_streak, day: u.streak_day }, day);
+      xpGain = XP.daily;
+      await env.DB.batch([
+        env.DB.prepare('UPDATE daily_runs SET solved_at = ? WHERE user_id = ? AND day = ?').bind(now, user.id, day),
+        env.DB.prepare('UPDATE users SET xp = xp + ?, streak = ?, best_streak = ?, streak_day = ? WHERE id = ?').bind(xpGain, st.streak, st.best, st.day, user.id),
+      ]);
+      run.solved_at = now;
+    }
+    return json({ ms: run.solved_at - run.started_at, xpGain, board: await dailyBoard(env, day, user.id) });
+  }
+
+  /* ----- voice chat ----- */
+  if (path === '/api/voice/ice' && req.method === 'GET') return json(await voiceIce(env));
+  if (path === '/api/voice/usage' && req.method === 'POST') {
+    const { bytes = 0 } = await readBody(req);
+    // one minute of voice from up to 9 people is well under 30 MB; ignore anything bigger
+    const n = Math.floor(Number(bytes));
+    if (Number.isFinite(n) && n > 0 && n <= 30e6) {
+      await env.DB.prepare('INSERT INTO voice_usage (month, bytes) VALUES (?, ?) ON CONFLICT(month) DO UPDATE SET bytes = bytes + excluded.bytes')
+        .bind(monthKey(), n).run();
+    }
+    return json({ ok: true });
+  }
+
+  /* ----- admin ----- */
+  if (path.startsWith('/api/admin/')) {
+    if (!user.admin) return json({ error: 'Admins only.' }, 403);
+    return handleAdmin(req, env, path);
+  }
 
   // Set or change your password. Needs the current one, unless the account has none yet
   // (Google-only) or you signed in with Google in the last 15 minutes (forgot password).
@@ -330,3 +514,17 @@ export default {
     return env.ASSETS.fetch(req);
   },
 };
+
+// Most wins first; then the better win rate; then more games played. Players level on all three
+// share a rank (1, 2, 2, 4). Sends the top 50 plus your own row.
+function rankPlayers(rows, me) {
+  const list = rows.map(r => ({ id: r.id, name: r.name, played: r.played, wins: r.wins || 0, rate: r.played ? (r.wins || 0) / r.played : 0 }))
+    .sort((a, b) => b.wins - a.wins || b.rate - a.rate || b.played - a.played || a.name.localeCompare(b.name));
+  list.forEach((r, i) => {
+    const prev = list[i - 1];
+    r.rank = prev && prev.wins === r.wins && prev.rate === r.rate && prev.played === r.played ? prev.rank : i + 1;
+  });
+  const out = r => ({ rank: r.rank, name: r.name, wins: r.wins, played: r.played, rate: Math.round(r.rate * 100), me: r.id === me });
+  const mine = list.find(r => r.id === me);
+  return { players: list.length, top: list.slice(0, 50).map(out), me: mine ? out(mine) : null };
+}

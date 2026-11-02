@@ -11,6 +11,8 @@ export function useRemoteRoom(token) {
   const [error, setError] = useState(null);
   const [offset, setOffset] = useState(0);
   const ws = useRef(null);
+  const rtc = useRef(new Set());
+  const reacts = useRef(new Set());
 
   useEffect(() => {
     let alive = true, tries = 0, dead = false, over = false;
@@ -20,6 +22,8 @@ export function useRemoteRoom(token) {
       sock.onopen = () => { if (document.hidden) sock.send(JSON.stringify({ type: 'hidden' })); };
       sock.onmessage = e => {
         const m = JSON.parse(e.data);
+        if (m.type === 'rtc') { rtc.current.forEach(fn => fn(m.from, m.data)); return; }
+        if (m.type === 'react') { reacts.current.forEach(fn => fn(m.from, m.r)); return; }
         if (m.type === 'state') { tries = 0; over = m.status === 'over'; setOffset(m.serverNow - Date.now()); setState(m); }
         else if (m.type === 'error') {
           if (m.fatal) { dead = true; setFatal(m.message); }
@@ -48,7 +52,9 @@ export function useRemoteRoom(token) {
   }, [token]);
 
   const send = useCallback(obj => { const s = ws.current; if (s && s.readyState === 1) s.send(JSON.stringify(obj)); }, []);
-  return { state, send, fatal, error, offset };
+  const subscribeRtc = useCallback(fn => { rtc.current.add(fn); return () => rtc.current.delete(fn); }, []);
+  const subscribeReact = useCallback(fn => { reacts.current.add(fn); return () => reacts.current.delete(fn); }, []);
+  return { state, send, fatal, error, offset, subscribeRtc, subscribeReact };
 }
 
 export function useLocalRoom(game, size, name, options) {

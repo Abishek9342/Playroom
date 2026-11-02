@@ -516,3 +516,25 @@ for (let t = 0; t < 2000; t++) {
   assert.deepEqual(normalizeOptions('imposter', 6, {}).options, { imposters: 1, category: 0, hint: 1, laps: 2, voteSecs: 90 });
   console.log('imposter ok');
 }
+
+// XP, levels, streaks and the seeded daily puzzle
+{
+  const x = await import('../shared/xp.js');
+  const a = genPatches(6, x.seeded('playroom-daily-2026-11-02'));
+  const b = genPatches(6, x.seeded('playroom-daily-2026-11-02'));
+  const c = genPatches(6, x.seeded('playroom-daily-2026-11-03'));
+  assert.deepEqual(a.clues, b.clues, 'same day, same puzzle for everyone');
+  assert.notDeepEqual(a.clues, c.clues, 'a new puzzle each day');
+  assert.equal(checkPatches(6, a.clues, a.answer), null, 'daily puzzle is solvable');
+  assert.deepEqual([0, 99, 100, 299, 300, 600, 1000].map(v => x.levelInfo(v).level), [1, 1, 2, 2, 3, 4, 5]);
+  assert.equal(x.xpForGame({ won: true, ms: 7 * 60000 }), 20 + 30 + 14);
+  assert.equal(x.xpForGame({ won: false, ms: 99 * 60000 }), 20 + 20, 'time bonus capped at 10 minutes');
+  assert.deepEqual(x.nextStreak({ streak: 3, best: 5, day: '2026-11-01' }, '2026-11-02'), { streak: 4, best: 5, day: '2026-11-02' });
+  assert.deepEqual(x.nextStreak({ streak: 3, best: 5, day: '2026-10-30' }, '2026-11-02'), { streak: 1, best: 5, day: '2026-11-02' }, 'missed a day: back to 1');
+  assert.deepEqual(x.nextStreak({ streak: 6, best: 5, day: '2026-11-02' }, '2026-11-02'), { streak: 6, best: 6, day: '2026-11-02' }, 'twice a day counts once');
+  assert.equal(x.liveStreak({ streak: 4, day: '2026-11-01' }, '2026-11-02'), 4);
+  assert.equal(x.liveStreak({ streak: 4, day: '2026-10-31' }, '2026-11-02'), 0);
+  assert.equal(x.prevDay('2026-11-01'), '2026-10-31');
+  assert.equal(x.levelTitle(1), 'Rookie'); assert.equal(x.levelTitle(9), 'Pro');
+  console.log('xp ok');
+}

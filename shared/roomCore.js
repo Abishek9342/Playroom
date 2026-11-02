@@ -48,6 +48,7 @@ export class RoomCore {
     const p = this.find(id);
     if (!p) return;
     p.connected = false;
+    p.voice = false;
     if (this.status === 'waiting') {
       this.players = this.players.filter(x => x.id !== id);
       this.log(`${p.name} left`);
@@ -84,7 +85,7 @@ export class RoomCore {
     if (this.status !== 'playing') return 'The game isn’t running.';
     if (!p.alive) return 'You’re out of this game.';
     const err = this.game.handle(id, m || {});
-    if (!err) this.onChange();
+    if (!err) { p.moves = (p.moves || 0) + 1; this.onChange(); }
     return err;
   }
 
@@ -108,6 +109,8 @@ export class RoomCore {
   }
 
   start() {
+    this.startedAt = Date.now();
+    for (const p of this.players) { p.moves = 0; p.outAt = null; }
     this.status = 'playing';
     this.game = createGame(this.cfg.game, this.ctx(), { isWord: this.isWord, options: this.cfg.options });
     this.log('Game started');
@@ -119,6 +122,7 @@ export class RoomCore {
     const p = this.find(id);
     if (!p || !p.alive || this.status !== 'playing') return;
     p.alive = false;
+    p.outAt = Date.now();
     p.reason = reason;
     p.away = false;
     const t = this.graces.get(id);
@@ -140,7 +144,7 @@ export class RoomCore {
     const w = this.find(winner);
     this.log(w ? `${w.name} won` : extra.title || 'Game over');
     this.onChange();
-    this.onFinish();
+    this.onFinish(this.summary());
   }
 
   // After a game ends, everyone still in the room votes; when all have, the same seats play
@@ -178,6 +182,25 @@ export class RoomCore {
     return null;
   }
 
+  // What the stats keep about a finished game: per player, time in the game and moves made.
+  summary() {
+    const end = Date.now(), start = this.startedAt || end;
+    const r = this.result || {};
+    const winners = new Set(r.winners || (r.winner ? [r.winner] : []));
+    return {
+      game: this.cfg.game, room: this.cfg.token, startedAt: start, endedAt: end, outcome: r.text || '',
+      players: this.players.filter(p => !p.bot).map(p => ({ id: p.id, ms: Math.max(0, (p.outAt || end) - start), moves: p.moves || 0, won: winners.has(p.id) })),
+    };
+  }
+
+  // Voice chat on/off for a player (the audio itself never touches the server).
+  setVoice(id, on) {
+    const p = this.find(id);
+    if (!p || !!p.voice === !!on) return;
+    p.voice = !!on;
+    this.onChange();
+  }
+
   stopTimers() {
     clearTimeout(this.timer);
     for (const t of this.graces.values()) clearTimeout(t);
@@ -191,7 +214,7 @@ export class RoomCore {
       type: 'state', you: uid, token: this.cfg.token, game: this.cfg.game, size: this.cfg.size, options: this.cfg.options,
       status: this.status, result: this.result, serverNow: Date.now(),
       match: this.match, declined: this.declined || null,
-      players: this.players.map(({ id, name, alive, connected, away, reason, bot, guest, rematch }) => ({ id, name, alive, connected, away, reason, bot: !!bot, guest: !!guest, rematch: !!rematch })),
+      players: this.players.map(({ id, name, alive, connected, away, reason, bot, guest, rematch, voice }) => ({ id, name, alive, connected, away, reason, bot: !!bot, guest: !!guest, rematch: !!rematch, voice: !!voice })),
       events: this.events.slice(-6),
       g: this.game ? this.game.view(uid) : null,
     };

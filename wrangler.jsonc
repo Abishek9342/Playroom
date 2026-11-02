@@ -16,4 +16,6 @@
   "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }] },
   // SQLite-backed Durable Objects are what the Workers Free plan supports.
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }]
+  // Admins: accounts signed in with Google as one of the emails in the ADMIN_EMAILS secret
+  // (comma separated): `npx wrangler secret put ADMIN_EMAILS`. Local dev reads it from .dev.vars.
 }

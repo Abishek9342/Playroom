@@ -274,16 +274,17 @@ class XO {
 // First valid solution wins (any valid solution counts).
 const rnd = n => Math.floor(Math.random() * n);
 
-export function genPatches(n) {
+export function genPatches(n, random = Math.random) {
+  const rnd = k => Math.floor(random() * k);
   const rects = [];
   const stack = [{ r: 0, c: 0, h: n, w: n }];
   while (stack.length) {
     const x = stack.pop();
     const a = x.h * x.w;
     // LinkedIn-like mix: mostly 3-9 squares, the odd 2 or single
-    const split = a > 9 || (a >= 6 && Math.random() < 0.5) || (a >= 4 && Math.random() < 0.15);
+    const split = a > 9 || (a >= 6 && random() < 0.5) || (a >= 4 && random() < 0.15);
     if (!split || (x.h < 2 && x.w < 2)) { rects.push(x); continue; }
-    let horiz = x.h >= 2 && x.w >= 2 ? (x.h === x.w ? Math.random() < 0.5 : x.h > x.w) : x.h >= 2;
+    let horiz = x.h >= 2 && x.w >= 2 ? (x.h === x.w ? random() < 0.5 : x.h > x.w) : x.h >= 2;
     const len = horiz ? x.h : x.w;
     // prefer cuts that don't leave 1-wide slivers
     const k = len >= 4 ? 2 + rnd(len - 3) : 1 + rnd(len - 1);
@@ -295,7 +296,7 @@ export function genPatches(n) {
   const clues = rects.map((x, i) => {
     let shape = x.h === x.w ? 'square' : x.w > x.h ? 'wide' : 'tall';
     let num = x.h * x.w;
-    const roll = Math.random();
+    const roll = random();
     if (roll < 0.28) shape = 'any';
     else if (roll < 0.45 && num > 1) num = null; // shape only
     return { r: x.r + rnd(x.h), c: x.c + rnd(x.w), n: num, shape, color: i };

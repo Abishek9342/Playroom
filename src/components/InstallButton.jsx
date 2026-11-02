@@ -11,11 +11,11 @@ export function InstallButton() {
   if (inst.installed || (!inst.canPrompt && !inst.ios)) return null;
   return (
     <>
-      <button className="btn btn-quiet btn-sm" onClick={async () => {
+      <button className="btn btn-quiet btn-sm install-btn" aria-label="Install app" onClick={async () => {
         if (inst.canPrompt) { if (await inst.prompt()) toast('Installed. Open Playroom from your home screen.'); }
         else setHelp(true);
       }}>
-        <Icon name="download" size={16} /> Install app
+        <Icon name="download" size={16} /><span className="install-label"> Install app</span>
       </button>
       <Sheet open={help} onClose={() => setHelp(false)} title="Install on iPhone or iPad">
         <ol className="steps">

@@ -138,6 +138,13 @@ test/                games.test.js, e2e.mjs, ui-smoke.mjs
 
 ## Design system (keep consistent)
 
+**Since 2026-11-02 the look is the "board-game box" theme the user chose** (yellow table, royal blue,
+tomato red, ink outlines, hard offset shadows, Lilita One headings, sticker badges, tilted per-game
+coloured boxes; dark = indigo). Restyle through the tokens and the theme block at the end of
+styles.css. The notes below about a neutral palette are history; the rules on real cards, icons, no
+emoji, copy style and mobile-first still apply.
+
+
 The user rejected the first, playful design as looking "AI generated". The current design aims
 for a real, professional card-game app. Keep it that way:
 - Neutral app chrome (`--bg`, `--surface`, `--border`, `--text*` tokens in `src/styles.css`),

@@ -5,7 +5,7 @@ import { Logo, Icon } from '../components/Icon.jsx';
 import { Segmented, Field } from '../components/Controls.jsx';
 import { TokenInput } from '../components/TokenInput.jsx';
 import { GameArt } from '../components/GameArt.jsx';
-import { GAMES } from '../lib/meta.js';
+import { GAMES, GAME_COLORS } from '../lib/meta.js';
 import { GoogleButton } from '../components/Google.jsx';
 
 export function Landing({ onSignedIn, inviteToken, config = {} }) {
@@ -18,7 +18,7 @@ export function Landing({ onSignedIn, inviteToken, config = {} }) {
         <p className="lead">Card, word and puzzle games for friends. One person hosts a room and shares the code; everyone else joins with their name.</p>
         <ul className="landing-games">
           {Object.entries(GAMES).map(([k, g], i) => (
-            <motion.li key={k} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.06 }}>
+            <motion.li key={k} style={{ '--game': GAME_COLORS[k] }} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.06 }}>
               <GameArt kind={k} /><span>{g.name}</span>
             </motion.li>
           ))}

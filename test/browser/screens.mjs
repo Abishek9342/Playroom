@@ -2,7 +2,8 @@
 // Usage: npm run build:demo && node test/browser/screens.mjs light|dark  → screenshots/
 import { launch } from './launch.mjs';
 import { mkdirSync } from 'node:fs';
-const OUT = new URL('../../screenshots/', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+const OUT = fileURLToPath(new URL('../../screenshots/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const b = await launch();
 const url = new URL('../../dist-demo/index.html', import.meta.url).href;
@@ -16,14 +17,17 @@ const shot = async name => { await p.screenshot({ path: `${OUT}${scheme}-${name}
 await p.goto(url); await sleep(1500); await shot('1-home');
 await p.evaluate(() => [...document.querySelectorAll('.game-card')].find(b => b.textContent.includes('5 Cards')).click()); await sleep(700); await shot('2-sheet');
 await p.evaluate(() => { location.hash = 'practice-cards-3'; }); await sleep(900);
-await p.evaluate(() => { location.hash = 'practice-cards-3-d1-e200-1'; }); await sleep(3000); await shot('3-cards');
+await p.evaluate(() => { location.hash = 'practice-cards-3-d1-e200-1'; }); await sleep(7000); await shot('3-cards');
 // select a card if it's my turn
 await p.evaluate(() => { const c = document.querySelector('.hand-card:not([disabled])'); if (c) c.click(); }); await sleep(500); await shot('4-cards-selected');
-await p.evaluate(() => { location.hash = 'practice-wordchain-3'; }); await sleep(3500);
+await p.evaluate(() => { location.hash = 'practice-wordchain-3'; }); await sleep(7000);
 await p.evaluate(() => { const i = document.querySelector('#wc-input'); if (i) { const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; s.call(i, 'garden'); i.dispatchEvent(new Event('input', { bubbles: true })); i.form.requestSubmit(); } });
 await sleep(6000); await shot('5-wordchain');
-await p.evaluate(() => { location.hash = 'practice-xo-2'; }); await sleep(2500);
+await p.evaluate(() => { location.hash = 'practice-xo-2'; }); await sleep(6500);
 await p.evaluate(() => { const b = [...document.querySelectorAll('.xo-hit button')].find(b => !b.disabled); if (b) b.click(); }); await sleep(2500); await shot('6-xo');
-await p.evaluate(() => { location.hash = 'practice-patches-2'; }); await sleep(2500); await shot('7-patches');
+await p.evaluate(() => { location.hash = 'practice-patches-2'; }); await sleep(6500); await shot('7-patches');
+// 5 Cards on a phone held sideways (landscape table layout)
+await p.setViewport({ width: 844, height: 390, deviceScaleFactor: 2 });
+await p.evaluate(() => { location.hash = 'practice-cards-4-d1-e200-2'; }); await sleep(7500); await shot('8-cards-landscape');
 console.log(scheme, 'errors:', errs.length ? errs.slice(0, 5) : 'none');
 await b.close();
