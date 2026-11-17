@@ -29,19 +29,20 @@ const page = {
 };
 
 // Routes: #room-CODE, #join-CODE (invite link), #practice,
-//   #practice-<game>-<n>[-d<decks>][-e<exit>][-b<board>][-o<bestOf>][-<nonce>]
+//   #practice-<game>-<n>[-d<decks>][-e<exit>][-t<target>][-b<board>][-o<bestOf>][-<nonce>]
 function parse(hash) {
   let m = hash.match(/^#(room|join)-([A-Z2-9]{6})$/);
   if (m && !DEMO) return { kind: m[1], token: m[2], key: 'room-' + m[2] };
-  m = hash.match(/^#practice-(wordchain|xo|patches|cards)-(\d+)(?:-d(\d))?(?:-e(\d+))?(?:-b(\d))?(?:-o(\d))?(?:-\d+)?$/);
+  m = hash.match(/^#practice-(wordchain|xo|patches|cards)-(\d+)(?:-d(\d))?(?:-e(\d+))?(?:-t(\d+))?(?:-b(\d))?(?:-o(\d))?(?:-\d+)?$/);
   if (m) {
     const g = GAMES[m[1]], n = +m[2];
     if (n >= g.min && n <= g.max) {
       const raw = {};
       if (m[3]) raw.decks = +m[3];
       if (m[4]) raw.exitAt = +m[4];
-      if (m[5]) raw.board = +m[5];
-      if (m[6]) raw.bestOf = +m[6];
+      if (m[5]) raw.target = +m[5];
+      if (m[6]) raw.board = +m[6];
+      if (m[7]) raw.bestOf = +m[7];
       const { options } = normalizeOptions(m[1], n, raw);
       return { kind: 'practice', game: m[1], size: n, options: options || defaultOptions(m[1], n), key: hash };
     }

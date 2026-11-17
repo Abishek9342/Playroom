@@ -1,5 +1,97 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-11-06 Imposter: 10 new categories x 40 words, sub-category hint (chess -> "Sports › Indoor games") — DEPLOYED 2026-11-06 (version 5b9360bf)
+- shared/imposterWords.js replaced: Transport, Electronic gadgets, Accessories, Animals, Jobs, Things at home,
+  Places, Food snacks & desserts, Home appliances, Sports (user's list, filled to 40 each). Each category has
+  sub-categories (`groups`); Sports = Water sports / Winter sports / Indoor games / Outdoor games, 10 each (user's
+  ask). Old Travel and India categories are gone. 400 words, no duplicates. `groupOf(category, word)`.
+- pickSecret returns `{category, group, word}`; Imposter view has `group` (null for the Imposter with hint off,
+  like `category`). SecretCard shows "Hint: Sports › Indoor games"; crew card and results show "Category › Group";
+  pass-and-play the same. Settings/Guide text: "Imposter sees the category and sub-category".
+- Checked: npm test (new: 10 x 40, groups sum to 40, no dupes, Sports groups, chess/skiing groups, 200 Sports
+  picks land in their group, hint-off hides group, hint-on shows it), test:ui (no errors), build, build:demo;
+  Playwright 390x844 pass-and-play with Sports: crew "Carrom / Sports › Indoor games", Imposter "Hint: Sports ›
+  Indoor games"; second deal Sledding / Winter sports; no page errors. Online imposter-e2e not re-run (needs dev).
+- Deployed on the user's OK; live bundle checked (new categories, sub-category groups, hint text; no India).
+  Host setting `category` max is now 10 (was 8). OPEN: still uncommitted (with the earlier work).
+
+## 2026-11-06 Patches Submit vs mic, reactions removed, Word Chain winning score, 5 Cards first-turn Show, pause, exit = out — DEPLOYED 2026-11-06 (version afc64373)
+- Patches: on tall phones (browser bars/nav buttons leave a short viewport) the fixed voice dock sat on
+  "Submit solution" (360x640: Submit 553-597, dock 568-626). In-game upright Patches now puts the dock in the
+  page flow under the controls, like 5 Cards. Measured at 10 sizes 360x640..768x1024: no overlap, Submit on screen.
+- Quick reactions (the GG button, "comments") removed everywhere: VoiceDock, Avatar bubble, useRoom,
+  worker `react` message, shared/reactions.js deleted, CSS gone.
+- Word Chain: host setting `target` (Winning score) 50-500 step 50, default 150 (was a fixed 250). Settings
+  sheet stepper, lobby/room bar chip "First to N", practice hash `-t<target>`, guide text, unit tests.
+- 5 Cards: no Show on your first turn of a round (per player, every round); from your second turn as before.
+  Server refuses it, view has `canShow`, Show button disabled with "You can Show from your next turn".
+- Pause (all games, online + practice): RoomCore.pause/resume, `pause`/`resume` messages. Any player still in
+  can pause or resume; turn timer is stopped and re-armed with the time left; `deadline`/`turnStart`/`started`
+  shift by the pause; moves refused; no Word Chain knockouts while paused (grace restarts on resume); auto-resume
+  after 10 min (PAUSE_MAX_MS). Pause/play icon button in the room bar; cover screen over the board with Resume
+  (voice dock stays usable). Room code pill hidden in-game on <=400px phones to make room (nobody can join then).
+- Exit = out (all games): closing the tab (pagehide, not bfcache) or Back out of a running game sends `leave`,
+  so you're out at once and in a 2-player game the other player wins. Socket gone without a bye (app killed):
+  Away, then out after 30 s (DROP_MS) unless reconnected. Switching apps with the page alive is still just Away.
+- Checked: unit (incl. new pause/drop/target/show tests), ui-smoke, e2e + imposter-e2e + xp-e2e, build; real
+  Edge two-player runs at 360x640: pause/resume in Patches, 5 Cards, Word Chain, XO (clock frozen, mic tappable);
+  tab close / Back -> other player gets VICTORY in ~1.5 s; app switch stays Away; practice pause works.
+- Deployed on the user's OK; live JS/CSS checked (pause, winning score, first-turn Show text, Patches dock rule; no reaction code). OPEN: still uncommitted, including the 2026-11-03 work.
+
+## 2026-11-03 Patches rematch kept the old drawn patches — FIXED, DEPLOYED (version 619997f1)
+- Drawn rectangles are local state in src/games/Patches.jsx and never reset when a rematch brought a
+  new grid. Now a puzzle key (`state.match` + n + clue positions) clears rects/drag when it changes.
+- Checked: online 2 players draw patches, A submits a solver-found answer, both rematch: new grid
+  has 0 patches for both (without the fix: 2 each, so the test does catch it). Unit, ui-smoke, e2e pass.
+
+## 2026-11-03 5 Cards: couldn't drop/pick, game auto-drew — FIXED, DEPLOYED (version 1850d62c)
+- Real cause (online, upright): the "X drew from the pile" pick note pushes the hand down, so Drop/Show
+  slid under the fixed voice dock (bottom-left); taps hit the dock, the drop never happened and the
+  turn timer auto-played. Practice has no dock, so it never showed there. Fix: in upright 5 Cards
+  in-game the dock is `position: static` (a row under the hand) and the room loses its dock padding.
+  Table mode was already fine (dock on the left, no overlap).
+- Second bug (from the drag-to-rearrange Hand): `shown` was a useMemo on the `cards` array, but the
+  practice engine mutates the hand in place, so a drawn card stayed invisible. Now computed per render.
+- Checked: online 2-player touch test, 4 turns each at 390x844, 360x640 and table mode: drop, draw
+  from deck and take opponent's drop all work for both players, dock covers nothing; practice draw
+  shows the card; unit, ui-smoke, e2e pass.
+
+## 2026-11-03 UI sweep on small phones: 7 fixes — DEPLOYED (version 907fd9e6, with dark theme + hand changes)
+- Swept 48 screens at 360x640 and 390x844. Fixed (block "Small-phone fixes" at the end of styles.css):
+  1. Online room bar: title one line with ellipsis; code pill smaller, copy icon hidden <=400px.
+  2. 5 Cards upright, short screens (max-height 760): compact felt (50x72 cards), chips one scrolling
+     row, ticker hidden, smaller hand: Drop/Show now end at 629px on a 640px phone (was 807).
+  3. Patches quilt and XO board capped by height (`100dvh - 385px` / `- 375px`, min 220): Submit at
+     597px and 5x5 board at 590px on 640px phones; normal phones unchanged.
+  4. Landing tiles: no mid-word breaks (was `overflow-wrap: anywhere`).
+  5. Imposter settings: options 1 and 2 always shown, 2 disabled under 5 players (Segmented now
+     supports `disabled` per option).
+  6. Table-mode "Upright" chip min 36px.
+  7. haptics buzz() skips until `navigator.userActivation.hasBeenActive` (no console warning).
+- Checked: re-measured at both sizes, screenshots, console clean; unit, ui-smoke, e2e, imposter-e2e pass.
+
+## 2026-11-03 5 Cards hand: no shaking, drag to rearrange — DEPLOYED (907fd9e6)
+- Picked cards used a motion spring + `layout`; in table mode (rotated .app) layout measuring made the
+  hand jitter. New `Hand` component in src/games/Cards.jsx: picked = CSS lift (translateY -16px),
+  no layout animation. Press + drag (8px threshold, pointer capture, elementFromPoint so it works
+  rotated) reorders; tap toggles pick (only on your turn); Enter/Space via click detail 0. Order is
+  per player, local, reset each round; new cards append, dropped cards leave. Cards are never
+  `disabled` now (class `idle` when it's not your turn); tests select `.hand-card:not(.idle)`.
+- Checked: puppeteer touch tap + drag, upright and table mode: tap picks, positions identical 1.2 s
+  later, last card dragged to the front, pick kept; ui-smoke, unit, e2e pass.
+
+## 2026-11-03 One dark-blue theme, no yellow — DEPLOYED (907fd9e6)
+- User: light mode was yellow and dark mode blue; wants dark blue for everyone and no yellow buttons.
+  `:root` now holds the dark tokens, `color-scheme: dark`; the prefers-color-scheme/data-theme
+  override blocks are gone (Google button uses its dark style always). `--sun` (all the old yellow:
+  account button, code pill, tags, selected tabs, winner rows, chips, reaction bubble) = periwinkle
+  #8EA6FF with dark ink. Countdown digits cream, VICTORY / LEVEL UP / rank #1 periwinkle, dots white
+  6%. Confetti gold -> periwinkle/red. theme-color + manifest #191538. Win card image redrawn dark.
+- Unchanged on purpose: dot print, fonts, rounded boxes, per-game box colours, felt, pastel avatar
+  and patch tones.
+- Checked: screenshots with the phone set to LIGHT mode (landing, home, lobby, game, result,
+  account/ranking, patches): all dark blue, 0 yellow elements; win card render; unit + ui-smoke pass.
+
 ## 2026-11-02 5 Cards table mode: game-over card cut off — FIXED, DEPLOYED (version b7d867ad)
 - Cause: table mode rotates `.app`, but `.dialog/.sheet` used `max-height: calc(100vh - 32px)` = the
   phone's LONG side, so the result card overflowed the turned screen (top + "Back to games" hidden).

@@ -52,7 +52,7 @@ console.log('started:', await host.evaluate(() => document.querySelector('.fc-me
 // play: whoever's turn drops their first card then draws, for 4 turns, then host Shows on their turn
 const act = async (p, name) => p.evaluate(() => {
   const deck = document.querySelector('.deck.live'); if (deck) { deck.click(); return 'picked'; }
-  const c = document.querySelector('.hand-card:not([disabled])'); if (!c) return 'wait';
+  const c = document.querySelector('.hand-card:not(.idle)'); if (!c) return 'wait';
   c.click(); return 'selected';
 });
 let turns = 0;

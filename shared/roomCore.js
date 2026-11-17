@@ -1,6 +1,10 @@
 import { createGame, GAMES } from './games.js';
 
 export const GRACE_MS = 3000; // away longer than this = eliminated
+// Other games: a player whose connection is gone this long (app killed, tab closed without saying
+// bye) is out, so in a 2-player game the other one wins (user's rule, 2026-11-06).
+export const DROP_MS = 30000;
+export const PAUSE_MAX_MS = 10 * 60e3; // a paused game resumes by itself after this
 
 // Everything about one room except networking: seats, start, moves,
 // away/elimination, results and per-player views. The Durable Object wraps
@@ -17,6 +21,10 @@ export class RoomCore {
     this.status = 'waiting';  // waiting | playing | over
     this.game = null;
     this.timer = null;
+    this.timerFn = null;      // the game's pending timer, kept so a pause can re-arm it
+    this.timerDue = 0;
+    this.paused = null;       // { by, name, at, until } while a player has paused the game
+    this.pauseTimer = null;
     this.graces = new Map();
     this.result = null;
     this.events = [];
@@ -53,8 +61,10 @@ export class RoomCore {
       this.players = this.players.filter(x => x.id !== id);
       this.log(`${p.name} left`);
       this.onChange();
-    } else if (this.status === 'playing' && p.alive) this.away(id, 'left the page');
-    else {
+    } else if (this.status === 'playing' && p.alive) {
+      if (this.strict()) this.away(id, 'left the page');
+      else this.drop(id);
+    } else {
       if (this.status === 'over') p.rematch = false; // a vote from someone who left doesn't stand
       this.onChange();
     }
@@ -65,9 +75,19 @@ export class RoomCore {
   away(id, reason) {
     const p = this.find(id);
     if (!p || !p.alive || this.status !== 'playing' || this.graces.has(id)) return;
-    if (!this.strict()) { if (!p.away) { p.away = true; this.onChange(); } return; }
+    // paused: taking a break off the screen is the point, so nobody is knocked out meanwhile
+    if (!this.strict() || this.paused) { if (!p.away) { p.away = true; this.onChange(); } return; }
     p.away = true;
     this.graces.set(id, setTimeout(() => { this.graces.delete(id); this.eliminate(id, reason); }, GRACE_MS));
+    this.onChange();
+  }
+
+  // Connection gone in a non-strict game: Away now, out after DROP_MS unless they reconnect.
+  drop(id) {
+    const p = this.find(id);
+    if (!p || !p.alive || this.status !== 'playing' || this.graces.has(id)) return;
+    p.away = true;
+    if (!this.paused) this.graces.set(id, setTimeout(() => { this.graces.delete(id); this.eliminate(id, 'left the game'); }, DROP_MS));
     this.onChange();
   }
 
@@ -84,6 +104,7 @@ export class RoomCore {
     if (!p) return 'You’re not in this room.';
     if (this.status !== 'playing') return 'The game isn’t running.';
     if (!p.alive) return 'You’re out of this game.';
+    if (this.paused) return 'The game is paused. Tap Resume to carry on.';
     const err = this.game.handle(id, m || {});
     if (!err) { p.moves = (p.moves || 0) + 1; this.onChange(); }
     return err;
@@ -91,12 +112,59 @@ export class RoomCore {
 
   leave(id) { this.eliminate(id, 'left the game'); }
 
+  // Any player still in can pause a running game (user's rule, 2026-11-06). The turn clock stops,
+  // moves wait, and in Word Chain leaving the screen doesn't knock you out. Anyone in can resume;
+  // after PAUSE_MAX_MS it resumes by itself so a room can't get stuck.
+  pause(id) {
+    const p = this.find(id);
+    if (!p || p.bot) return 'You’re not in this room.';
+    if (this.status !== 'playing') return 'The game isn’t running.';
+    if (!p.alive) return 'You’re out of this game.';
+    if (this.paused) return null;
+    const now = Date.now();
+    this.paused = { by: id, name: p.name, at: now, until: now + PAUSE_MAX_MS, left: this.timer ? Math.max(0, this.timerDue - now) : null };
+    clearTimeout(this.timer); this.timer = null;
+    for (const t of this.graces.values()) clearTimeout(t);
+    this.graces.clear();
+    this.pauseTimer = setTimeout(() => this.resume(null), PAUSE_MAX_MS);
+    this.log(`${p.name} paused the game`);
+    this.onChange();
+    return null;
+  }
+
+  // id null = the pause ran out.
+  resume(id) {
+    const p = id === null ? null : this.find(id);
+    if (id !== null && (!p || p.bot)) return 'You’re not in this room.';
+    if (!this.paused || this.status !== 'playing') return null;
+    if (p && !p.alive) return 'You’re out of this game.';
+    const { at, left } = this.paused;
+    const gap = Date.now() - at;
+    this.paused = null;
+    clearTimeout(this.pauseTimer); this.pauseTimer = null;
+    // turn clocks pick up where they stopped: every game keeps its clock in these fields
+    for (const k of ['deadline', 'turnStart', 'started']) if (this.game && this.game[k] > 0) this.game[k] += gap;
+    if (left !== null && this.timerFn) this.ctx().setTimer(left, this.timerFn);
+    this.log(p ? `${p.name} resumed the game` : 'The pause ran out. Game on');
+    // Word Chain: anyone still off the screen gets the usual grace period from now
+    // still off the screen / disconnected: the usual grace period starts from now
+    for (const x of this.players) {
+      if (!x.alive || !x.away) continue;
+      if (this.strict()) { x.away = false; this.away(x.id, x.connected ? 'switched tabs' : 'left the page'); }
+      else if (!x.connected) this.drop(x.id);
+    }
+    this.onChange();
+    return null;
+  }
+
   ctx() {
     return {
       seats: () => this.players.map(p => p.id),
       alive: () => this.players.filter(p => p.alive).map(p => p.id),
       setTimer: (ms, fn) => {
         clearTimeout(this.timer);
+        this.timerFn = fn;
+        this.timerDue = Date.now() + ms;
         this.timer = setTimeout(() => {
           this.timer = null;
           if (this.status === 'playing') { fn(); this.onChange(); }
@@ -110,6 +178,7 @@ export class RoomCore {
 
   start() {
     this.startedAt = Date.now();
+    this.paused = null;
     for (const p of this.players) { p.moves = 0; p.outAt = null; }
     this.status = 'playing';
     this.game = createGame(this.cfg.game, this.ctx(), { isWord: this.isWord, options: this.cfg.options });
@@ -203,6 +272,8 @@ export class RoomCore {
 
   stopTimers() {
     clearTimeout(this.timer);
+    clearTimeout(this.pauseTimer); this.pauseTimer = null;
+    this.paused = null;
     for (const t of this.graces.values()) clearTimeout(t);
     this.graces.clear();
   }
@@ -214,6 +285,7 @@ export class RoomCore {
       type: 'state', you: uid, token: this.cfg.token, game: this.cfg.game, size: this.cfg.size, options: this.cfg.options,
       status: this.status, result: this.result, serverNow: Date.now(),
       match: this.match, declined: this.declined || null,
+      paused: this.paused ? { by: this.paused.by, name: this.paused.name, at: this.paused.at, until: this.paused.until } : null,
       players: this.players.map(({ id, name, alive, connected, away, reason, bot, guest, rematch, voice }) => ({ id, name, alive, connected, away, reason, bot: !!bot, guest: !!guest, rematch: !!rematch, voice: !!voice })),
       events: this.events.slice(-6),
       g: this.game ? this.game.view(uid) : null,

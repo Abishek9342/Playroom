@@ -73,7 +73,7 @@ for (const [g, n] of games) {
     let turns = 0, called = false;
     for (let k = 0; k < 40 && !d.querySelector('.round-result') && !d.querySelector('.result'); k++) {
       const stack = d.querySelector('.deck.live');
-      const card = d.querySelector('.hand-card:not([disabled])');
+      const card = d.querySelector('.hand-card:not(.idle)');
       if (stack) { stack.click(); turns++; }
       else if (card && turns >= 3 && !called) {
         d.querySelector('.action-bar .btn-danger').click();

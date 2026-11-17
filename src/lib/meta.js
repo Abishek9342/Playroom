@@ -24,6 +24,7 @@ export const PATCH_COLORS = ['#9CC9B4', '#E9C77B', '#A9BDE8', '#E8A6A1', '#C7B3E
 
 export function describeOptions(game, size, options = {}) {
   const bits = [`${size} players`];
+  if (game === 'wordchain') bits.push(`First to ${options.target || 150}`);
   if (game === 'cards') bits.push(`${options.decks || 1} ${options.decks > 1 ? 'decks' : 'deck'}`, `Exit at ${options.exitAt || 200}`);
   if (game === 'imposter') {
     const n = options.imposters || 1;

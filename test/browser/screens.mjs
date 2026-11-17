@@ -19,7 +19,7 @@ await p.evaluate(() => [...document.querySelectorAll('.game-card')].find(b => b.
 await p.evaluate(() => { location.hash = 'practice-cards-3'; }); await sleep(900);
 await p.evaluate(() => { location.hash = 'practice-cards-3-d1-e200-1'; }); await sleep(7000); await shot('3-cards');
 // select a card if it's my turn
-await p.evaluate(() => { const c = document.querySelector('.hand-card:not([disabled])'); if (c) c.click(); }); await sleep(500); await shot('4-cards-selected');
+await p.evaluate(() => { const c = document.querySelector('.hand-card:not(.idle)'); if (c) c.click(); }); await sleep(500); await shot('4-cards-selected');
 await p.evaluate(() => { location.hash = 'practice-wordchain-3'; }); await sleep(7000);
 await p.evaluate(() => { const i = document.querySelector('#wc-input'); if (i) { const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; s.call(i, 'garden'); i.dispatchEvent(new Event('input', { bubbles: true })); i.form.requestSubmit(); } });
 await sleep(6000); await shot('5-wordchain');

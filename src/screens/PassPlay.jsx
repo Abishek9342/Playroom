@@ -91,7 +91,7 @@ function Setup({ names, setNames, opts, setOpts, onStart }) {
           </select>
         </div>
         <div className="setting-row">
-          <div className="setting-label"><b>Imposter hint</b><span>Imposter sees the category</span></div>
+          <div className="setting-label"><b>Imposter hint</b><span>Imposter sees the category and sub-category</span></div>
           <Segmented id="pp-hint" label="Imposter hint" value={opts.hint} onChange={v => setOpts(o => ({ ...o, hint: v }))}
             options={[{ value: 0, label: 'Off' }, { value: 1, label: 'On' }]} />
         </div>
@@ -122,7 +122,7 @@ function Cards({ game, setGame, names, opts }) {
         </>
       ) : (
         <>
-          <SecretCard big shown role={imp ? 'imposter' : 'crew'} word={game.word} category={!imp || opts.hint ? game.category : null}
+          <SecretCard big shown role={imp ? 'imposter' : 'crew'} word={game.word} category={!imp || opts.hint ? game.category : null} group={!imp || opts.hint ? game.group : null}
             partners={partners} onToggle={() => {}} />
           <button className="btn btn-primary btn-lg" onClick={next}>{last ? 'Hide card and start' : `Hide card and pass to ${names[i + 1]}`}</button>
         </>
@@ -160,7 +160,7 @@ function Reveal({ game, names, onAgain, onChange }) {
     <Fade className="pass-center">
       <span className="kicker">The Imposter{game.imposters.length > 1 ? 's were' : ' was'}</span>
       <h1 className="h-display pass-imp">{game.imposters.map(i => names[i]).join(' & ')}</h1>
-      <div className="pass-word"><small>The secret word</small><b>{game.word}</b><span>{game.category}</span></div>
+      <div className="pass-word"><small>The secret word</small><b>{game.word}</b><span>{game.group ? `${game.category} › ${game.group}` : game.category}</span></div>
       <p className="muted">Did you catch them? If the Imposter can now say the secret word, they still win.</p>
       <button className="btn btn-primary btn-lg" onClick={onAgain}>Play again, new word</button>
       <button className="btn btn-quiet" onClick={onChange}>Change players or settings</button>

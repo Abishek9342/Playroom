@@ -1,8 +1,7 @@
 import { motion } from 'motion/react';
 import { colorFor } from '../lib/meta.js';
 import { Icon } from './Icon.jsx';
-import { useSpeaking, useReaction } from './VoiceDock.jsx';
-import { AnimatePresence } from 'motion/react';
+import { useSpeaking } from './VoiceDock.jsx';
 
 const R = 26, C = 2 * Math.PI * R;
 const initials = n => (n || '?').trim().split(/\s+/).map(w => [...w][0]).join('').slice(0, 2).toUpperCase();
@@ -10,7 +9,6 @@ const initials = n => (n || '?').trim().split(/\s+/).map(w => [...w][0]).join(''
 // Player token: initials, optional countdown ring, score badge and status line.
 export function Avatar({ player, you, host, progress = null, size = 48, score, compact = false }) {
   const talking = useSpeaking(player.id);
-  const reaction = useReaction(player.id);
   const out = !player.alive;
   const urgent = progress !== null && progress < 0.25;
   return (
@@ -27,12 +25,6 @@ export function Avatar({ player, you, host, progress = null, size = 48, score, c
         )}
         {host && <span className="av-host" title="Host"><Icon name="crown" size={11} /></span>}
         {player.voice && <span className="av-voice" title="Voice on"><Icon name="mic" size={10} /></span>}
-        <AnimatePresence>
-          {reaction && (
-            <motion.span key={reaction.n} className="av-react" role="status" initial={{ opacity: 0, x: '-50%', y: '-50%', scale: 0.4, rotate: -8 }} animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1, rotate: -4 }}
-              exit={{ opacity: 0, x: '-50%', y: '-120%', scale: 0.9 }} transition={{ type: 'spring', stiffness: 420, damping: 18 }}>{reaction.text}</motion.span>
-          )}
-        </AnimatePresence>
         {score !== undefined && <motion.span key={score} className="av-score" initial={{ scale: 1.5 }} animate={{ scale: 1 }}>{score}</motion.span>}
       </div>
       {!compact && (

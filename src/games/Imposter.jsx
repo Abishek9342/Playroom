@@ -6,7 +6,8 @@ import { Icon } from '../components/Icon.jsx';
 
 // The secret card: the word (crew) or "You're the Imposter". Hidden until tapped so people
 // sitting next to you can't read it.
-export function SecretCard({ role, word, category, partners = [], shown, onToggle, big }) {
+export function SecretCard({ role, word, category, group, partners = [], shown, onToggle, big }) {
+  const where = group ? `${category} › ${group}` : category; // "Sports › Indoor games"
   return (
     <button type="button" className={`secret${shown ? ' shown' : ''}${role === 'imposter' ? ' imp' : ''}${big ? ' big' : ''}`} onClick={onToggle}
       aria-label={shown ? 'Hide your card' : 'Show your card'}>
@@ -21,7 +22,7 @@ export function SecretCard({ role, word, category, partners = [], shown, onToggl
           <motion.span key="imp" className="secret-face" initial={{ rotateY: -90 }} animate={{ rotateY: 0 }} exit={{ rotateY: 90 }} transition={{ duration: 0.16 }}>
             <small>Your role</small>
             <b className="secret-word">Imposter</b>
-            {category ? <span className="secret-cat">Hint: the category is <b>{category}</b></span> : <span className="secret-cat">No hint this time</span>}
+            {category ? <span className="secret-cat">Hint: <b>{where}</b></span> : <span className="secret-cat">No hint this time</span>}
             {partners.length > 0 && <span className="secret-cat">Other Imposter: <b>{partners.join(', ')}</b></span>}
             <small>Blend in. Work out the word from everyone’s clues.</small>
           </motion.span>
@@ -29,7 +30,7 @@ export function SecretCard({ role, word, category, partners = [], shown, onToggl
           <motion.span key="word" className="secret-face" initial={{ rotateY: -90 }} animate={{ rotateY: 0 }} exit={{ rotateY: 90 }} transition={{ duration: 0.16 }}>
             <small>Secret word</small>
             <b className="secret-word">{word}</b>
-            {category && <span className="secret-cat">{category}</span>}
+            {category && <span className="secret-cat">{where}</span>}
             <small>Give clues that prove you know it, without giving it away.</small>
           </motion.span>
         )}
@@ -53,7 +54,7 @@ export function Imposter({ state, send, now, error }) {
   return (
     <div className="imp">
       {g.role && !over && (
-        <SecretCard role={g.role} word={g.word} category={g.category} partners={partners}
+        <SecretCard role={g.role} word={g.word} category={g.category} group={g.group} partners={partners}
           shown={shown} onToggle={() => setShown(s => !s)} big={g.phase === 'reveal'} />
       )}
 
@@ -231,7 +232,7 @@ function Reveal({ g, name, player, you }) {
         <div>
           <small>The secret word</small>
           <b className="imp-reveal-word">{g.word}</b>
-          <span className="muted">{g.category}</span>
+          <span className="muted">{g.group ? `${g.category} › ${g.group}` : g.category}</span>
         </div>
       </div>
       {g.guess && <p className="muted">{name(g.guess.by)} guessed “{g.guess.text}”: {g.guess.right ? 'right' : 'wrong'}.</p>}

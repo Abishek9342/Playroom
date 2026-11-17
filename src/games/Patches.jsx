@@ -29,9 +29,14 @@ export function Patches({ state, send }) {
   const can = state.status === 'playing' && me && me.alive;
   const [rects, setRects] = useState([]); // [{r,c,h,w,id,color}]
   const [drag, setDrag] = useState(null);
+  // a rematch (or any new grid) starts empty: clear what was drawn on the last puzzle
+  const puzzle = `${state.match || 0}|${n}|${g.clues.map(k => `${k.r}.${k.c}.${k.n}`).join(',')}`;
+  const [shownPuzzle, setShownPuzzle] = useState(puzzle);
+  if (shownPuzzle !== puzzle) { setShownPuzzle(puzzle); setRects([]); setDrag(null); }
   const grid = useRef(null);
   const seq = useRef(0);
-  const now = useNow(0, 1000);
+  const tick = useNow(0, 1000);
+  const now = state.paused ? state.paused.at : tick; // the race clock stops while paused
 
   const cellAt = e => {
     const b = grid.current.getBoundingClientRect();

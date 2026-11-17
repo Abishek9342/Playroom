@@ -16,5 +16,7 @@ export const onVibrate = fn => { listeners.add(fn); return () => listeners.delet
 
 export function buzz(pattern) {
   if (!enabled) return;
+  // browsers only allow vibration after the person has tapped the page once
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
   try { navigator.vibrate && navigator.vibrate(pattern); } catch {}
 }

@@ -79,9 +79,16 @@ test/                games.test.js, e2e.mjs, ui-smoke.mjs
   (no elimination for timeouts in this game). 30 s turns, 8 s pause between rounds.
 - **Game views hide secrets.** `view(forId)` must never leak other players' hands or the
   Patches answer (`puzzle.answer`). The e2e test checks both.
-- **Elimination (Word Chain only, `strictPresence` in shared/games.js):** client sends
+- **Elimination (Word Chain, `strictPresence` in shared/games.js):** client sends
   `hidden`/`visible` on `visibilitychange`; WebSocket close also counts. Server waits `GRACE_MS`
-  (3 s) before eliminating. Last player alive wins. Other games: leaving only marks you Away.
+  (3 s) before eliminating. Last player alive wins. Other games: switching apps only marks you Away,
+  but a closed connection is out after `DROP_MS` (30 s). Every game: closing the tab (pagehide) or
+  Back out of a running game sends `leave` = out at once (2 players: the other wins).
+- **Pause** is generic in RoomCore (`pause`/`resume`): any player in can pause/resume, timer re-armed
+  with the time left, game fields `deadline`/`turnStart`/`started` shifted by the pause (a new game
+  clock field must be added to that list), auto-resume after 10 min. No quick reactions any more.
+- **Word Chain** winning score is a host option `target` (50-500, default 150).
+- **5 Cards:** no Show on your first turn of each round (`played` set, view `canShow`).
 - **Rooms:** one Durable Object per 6-char invite token (alphabet excludes 0/O/1/I/L).
   Room auto-starts when seats == chosen size. New joins rejected once started.
 - **Hosts need an account; friends join with name + code only.** `POST /api/guest {name}`
@@ -138,9 +145,11 @@ test/                games.test.js, e2e.mjs, ui-smoke.mjs
 
 ## Design system (keep consistent)
 
-**Since 2026-11-02 the look is the "board-game box" theme the user chose** (yellow table, royal blue,
-tomato red, ink outlines, hard offset shadows, Lilita One headings, sticker badges, tilted per-game
-coloured boxes; dark = indigo). Restyle through the tokens and the theme block at the end of
+**The look is the "board-game box" theme, ONE dark-blue version for everyone** (since 2026-11-03:
+no light mode, no yellow; user's call). Deep indigo table with the dot print, periwinkle `--sun`
+highlights, tomato red buttons, ink outlines, hard offset shadows, Lilita One headings, sticker
+badges, per-game coloured boxes. The user rejected a full recolour (Arcade Night) and a black/white
+"Paper & Ink" restyle: change colours only when asked, keep dots, fonts and rounded boxes. Restyle through the tokens and the theme block at the end of
 styles.css. The notes below about a neutral palette are history; the rules on real cards, icons, no
 emoji, copy style and mobile-first still apply.
 

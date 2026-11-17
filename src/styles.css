@@ -1,63 +1,30 @@
-/* Playroom design system: "board-game box". Sunny yellow table, royal blue and tomato red,
-   thick ink outlines with hard printed-box shadows, a chunky display face for headings, and
-   a green-felt table for cards. Dark mode is a deep indigo "game night". Tokens by role. */
+/* Playroom design system: "board-game box", one dark-blue look (no light mode). Deep indigo table
+   with a dot print, periwinkle highlights and tomato red buttons, thick ink outlines with hard
+   printed-box shadows, a chunky display face for headings, and a green-felt table for cards. */
 :root {
-  --bg: #FFD84D; --surface: #FFFFFF; --surface-2: #FFF3C4; --surface-3: #FBE59A;
-  --border: rgba(30, 27, 58, .22); --border-strong: #1E1B3A;
-  --text: #1E1B3A; --text-2: #423D66; --text-3: #6E6890;
-  --brand: #2449E0; --brand-hover: #1C3BC0; --brand-soft: #DDE5FF; --on-brand: #FFFFFF;
-  --cta: #F0473A; --cta-hover: #DA3729; --on-cta: #FFFFFF;
-  --accent: #F0473A; --accent-ink: #C62828; --accent-soft: #FFE1DC;
-  --sun: #FFD84D; --sun-deep: #F5B700;
-  --danger: #D21F3C; --danger-soft: #FFE0E5; --success: #1F9D55;
-  --felt-1: #1D8A62; --felt-2: #0F5E43; --felt-rim: #1E1B3A; --on-felt: #FFF8E6; --on-felt-2: rgba(255, 248, 230, .78);
-  --art-line: #1E1B3A;
-  --outline: #1E1B3A; --line-w: 2.5px;
-  --shadow-1: 3px 3px 0 var(--outline);
-  --shadow-2: 5px 5px 0 var(--outline);
-  --shadow-3: 8px 8px 0 var(--outline);
-  --dots: rgba(30, 27, 58, .09);
-  --radius: 16px; --radius-sm: 12px;
-  --font: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", ui-sans-serif, system-ui, sans-serif;
-  color-scheme: light;
-  box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #191538; --surface: #25204D; --surface-2: #2E2860; --surface-3: #3A3375;
-    --border: rgba(0, 0, 0, .45); --border-strong: #07051A;
-    --text: #FFF6DE; --text-2: #CFC7F2; --text-3: #9B93C8;
-    --brand: #8EA6FF; --brand-hover: #A9BCFF; --brand-soft: #2B2F6B; --on-brand: #0E0B26;
-    --cta: #FF5A4A; --cta-hover: #FF7365; --on-cta: #FFFFFF;
-    --accent: #FF6A5A; --accent-ink: #FF8A7E; --accent-soft: #3D2140;
-    --sun: #FFD84D; --sun-deep: #F5B700;
-    --danger: #FF5C73; --danger-soft: #3E1A2E; --success: #4ADE80;
-    --felt-1: #187A57; --felt-2: #0C4A35; --felt-rim: #07051A;
-    --art-line: #07051A;
-    --outline: #07051A; --line-w: 2.5px;
-    --shadow-1: 3px 3px 0 var(--outline); --shadow-2: 5px 5px 0 var(--outline); --shadow-3: 8px 8px 0 var(--outline);
-    --dots: rgba(255, 216, 77, .07);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
   --bg: #191538; --surface: #25204D; --surface-2: #2E2860; --surface-3: #3A3375;
   --border: rgba(0, 0, 0, .45); --border-strong: #07051A;
   --text: #FFF6DE; --text-2: #CFC7F2; --text-3: #9B93C8;
   --brand: #8EA6FF; --brand-hover: #A9BCFF; --brand-soft: #2B2F6B; --on-brand: #0E0B26;
   --cta: #FF5A4A; --cta-hover: #FF7365; --on-cta: #FFFFFF;
   --accent: #FF6A5A; --accent-ink: #FF8A7E; --accent-soft: #3D2140;
-  --sun: #FFD84D; --sun-deep: #F5B700;
+  /* the highlight colour (was sunny yellow): soft periwinkle, dark ink on top */
+  --sun: #8EA6FF; --sun-deep: #6C86F5;
   --danger: #FF5C73; --danger-soft: #3E1A2E; --success: #4ADE80;
-  --felt-1: #187A57; --felt-2: #0C4A35; --felt-rim: #07051A;
+  --felt-1: #187A57; --felt-2: #0C4A35; --felt-rim: #07051A; --on-felt: #FFF8E6; --on-felt-2: rgba(255, 248, 230, .78);
   --art-line: #07051A;
   --outline: #07051A; --line-w: 2.5px;
-  --shadow-1: 3px 3px 0 var(--outline); --shadow-2: 5px 5px 0 var(--outline); --shadow-3: 8px 8px 0 var(--outline);
-  --dots: rgba(255, 216, 77, .07);
+  --shadow-1: 3px 3px 0 var(--outline);
+  --shadow-2: 5px 5px 0 var(--outline);
+  --shadow-3: 8px 8px 0 var(--outline);
+  --dots: rgba(255, 255, 255, .06);
+  --radius: 16px; --radius-sm: 12px;
+  --font: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", ui-sans-serif, system-ui, sans-serif;
   color-scheme: dark;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 *, *::before, *::after { box-sizing: inherit; }
@@ -366,7 +333,6 @@ a { color: var(--brand); }
 .hand-points b { color: var(--text); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
 .hand { display: flex; justify-content: center; gap: 8px; padding-top: 20px; flex-wrap: nowrap; }
 .hand-card { background: none; border: none; padding: 0; cursor: pointer; border-radius: 10px; position: relative; }
-.hand-card:disabled { cursor: default; }
 .hand-card.picked .pc { box-shadow: 0 0 0 3px var(--brand), 0 12px 24px rgba(0,0,0,.18); }
 .action-bar { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
 .action-bar .btn-danger { min-width: 96px; }
@@ -434,7 +400,7 @@ a { color: var(--brand); }
   .landing.invited .brand-lg { margin-bottom: 12px; }
   .brand-lg { margin-bottom: 18px; }
   .landing-games { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
-  .landing-games li { font-size: .62rem; padding: 5px 3px 6px; line-height: 1.2; overflow-wrap: anywhere; }
+  .landing-games li { font-size: .62rem; padding: 5px 3px 6px; line-height: 1.2; overflow-wrap: normal; word-break: normal; hyphens: none; }
   .join-card { margin-bottom: 22px; }
   .token-input .slot { width: 40px; height: 48px; }
   .pc-lg { --w: 60px; --h: 86px; }
@@ -557,8 +523,7 @@ button.code:active span { background: var(--brand-soft); border-color: var(--bra
 /* Google sign-in + account */
 .btn-google { gap: 10px; background: #fff; color: #1F1F1F; border: 1px solid #747775; font-weight: 600; text-decoration: none; }
 .btn-google:hover { background: #F8F9FA; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-google { background: #131314; color: #E3E3E3; border-color: #8E918F; } }
-:root[data-theme="dark"] .btn-google { background: #131314; color: #E3E3E3; border-color: #8E918F; }
+.btn-google { background: #131314; color: #E3E3E3; border-color: #8E918F; }
 .or { display: flex; align-items: center; gap: 10px; color: var(--text-3); font-size: .8rem; font-weight: 600; }
 .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 .forgot { min-height: 36px; font-size: .88rem; }
@@ -910,6 +875,13 @@ body::before { background: var(--bg); }
 .app:has(.voice-dock) .composer { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
 html.land .app:has(.voice-dock) .room { padding-bottom: 0; }
 html.land .app:has(.voice-dock) .composer { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+/* 5 Cards upright: the hand grows and shifts (pick notes, hints), so a floating dock could sit on top
+   of Drop/Show and swallow the tap. Here the dock is a normal row under the hand instead.
+   Patches too: on tall phones with browser bars/nav buttons the floating dock sat on Submit solution. */
+html:not(.land) .room-cards.in-game .voice-dock,
+html:not(.land) .room-patches.in-game .voice-dock { position: static; margin: 14px 0 calc(8px + env(safe-area-inset-bottom, 0px)); }
+html:not(.land) .app:has(.room-cards.in-game) .room,
+html:not(.land) .app:has(.room-patches.in-game) .room { padding-bottom: 0; }
 html.land .voice-dock { top: 58px; bottom: auto; flex-direction: column; }
 html.land .vd-mic { width: 48px; height: 48px; }
 @media (prefers-reduced-motion: reduce) { .switch span { transition: none; } }
@@ -917,13 +889,13 @@ html.land .vd-mic { width: 48px; height: 48px; }
 /* ===================== Motion pack: countdown, your-turn glow, victory ===================== */
 .countdown { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(30, 27, 58, .55); backdrop-filter: blur(3px); pointer-events: none; }
 .countdown span { font: 400 clamp(7rem, 40vw, 12rem)/1 var(--display); -webkit-text-stroke: 4px #1E1B3A; paint-order: stroke fill; text-shadow: 8px 8px 0 #1E1B3A; }
-.cd-num { color: #FFD84D; }
+.cd-num { color: #FFF6DE; }
 .cd-go { color: #F0473A; }
 .spotlight { position: fixed; inset: 0; z-index: 25; pointer-events: none; box-shadow: inset 0 0 0 5px var(--brand), inset 0 0 40px color-mix(in srgb, var(--brand) 35%, transparent); }
 .spotlight.urgent { box-shadow: inset 0 0 0 5px var(--cta), inset 0 0 40px color-mix(in srgb, var(--cta) 40%, transparent); animation: urgent-pulse .9s ease-in-out infinite; }
 @keyframes urgent-pulse { 50% { opacity: .35; } }
 .vic { justify-self: center; font: 400 clamp(2.8rem, 14vw, 4rem)/1 var(--display); text-transform: uppercase; color: var(--text-2); }
-.vic.won { color: #FFD84D; -webkit-text-stroke: 3px #1E1B3A; paint-order: stroke fill; text-shadow: 5px 5px 0 #1E1B3A; }
+.vic.won { color: #8EA6FF; -webkit-text-stroke: 3px #1E1B3A; paint-order: stroke fill; text-shadow: 5px 5px 0 #1E1B3A; }
 .sound-row { border-top: none; padding-top: 0; }
 
 /* ===================== XP, levels, streaks, daily puzzle ===================== */
@@ -964,7 +936,7 @@ html.land .vd-mic { width: 48px; height: 48px; }
 .acct-stats span { font-size: .74rem; color: var(--text-3); }
 .levelup { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; background: rgba(30, 27, 58, .55); backdrop-filter: blur(3px); }
 .levelup-card { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 28px 30px; border-radius: 22px; background: var(--surface); border: 3px solid var(--outline); box-shadow: var(--shadow-3); }
-.levelup-num { font: 400 clamp(4rem, 22vw, 6rem)/1 var(--display); color: #FFD84D; -webkit-text-stroke: 3px #1E1B3A; paint-order: stroke fill; text-shadow: 5px 5px 0 #1E1B3A; }
+.levelup-num { font: 400 clamp(4rem, 22vw, 6rem)/1 var(--display); color: #8EA6FF; -webkit-text-stroke: 3px #1E1B3A; paint-order: stroke fill; text-shadow: 5px 5px 0 #1E1B3A; }
 .levelup-title { font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--brand); margin-bottom: 8px; }
 .daily { display: grid; gap: 14px; }
 .daily-done { display: grid; justify-items: center; gap: 10px; text-align: center; position: relative; }
@@ -977,18 +949,8 @@ html.land .vd-mic { width: 48px; height: 48px; }
 .daily-board .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .daily-board b { font-variant-numeric: tabular-nums; }
 
-/* ===================== Quick reactions + share win card ===================== */
-.react-wrap { position: relative; }
-.vd-react { font: 400 1rem var(--display); letter-spacing: .02em; color: var(--text); }
-.react-pop { position: absolute; bottom: calc(100% + 10px); left: -40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: 220px; padding: 10px; z-index: 40;
-  border-radius: 16px; background: var(--surface); border: 3px solid var(--outline); box-shadow: var(--shadow-2); }
-.react-opt { padding: 9px 8px; border-radius: 10px; border: 2px solid var(--outline); background: var(--surface-2); color: var(--text); font: 400 1rem var(--display); cursor: pointer; box-shadow: 0 2px 0 var(--outline); }
-.react-opt:hover, .react-opt:focus-visible { background: var(--sun); color: #1E1B3A; }
-.react-opt:active { transform: translateY(2px); box-shadow: none; }
-.av-react { position: absolute; left: 50%; top: 50%; white-space: nowrap; z-index: 5; pointer-events: none; padding: 4px 10px; border-radius: 999px;
-  font: 400 .9rem var(--display); letter-spacing: .02em; color: #1E1B3A; background: var(--sun); border: 2px solid #1E1B3A; box-shadow: 2px 3px 0 #1E1B3A; }
+/* ===================== Share win card ===================== */
 .share-win { margin-top: 2px; }
-html.land .react-pop { left: calc(100% + 10px); bottom: auto; top: 0; }
 
 @media (prefers-reduced-motion: reduce) { .spotlight.urgent { animation: none; } }
 @media (max-width: 480px) { .account-name { min-width: 4ch; max-width: 8ch; } .install-label { display: none; } .install-btn { padding: 0 8px; } }
@@ -1007,7 +969,7 @@ html.land .react-pop { left: calc(100% + 10px); bottom: auto; top: 0; }
 .rank-row b { font: 400 1.15rem/1 var(--display); }
 .rank-row > span:nth-child(n+4) { color: var(--text-3); font-weight: 600; }
 .rank-pos { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 400 .95rem/1 var(--display); background: var(--surface); border: 2px solid var(--outline); }
-.rank-row.top1 .rank-pos { background: #FFD84D; color: #1E1B3A; }
+.rank-row.top1 .rank-pos { background: #8EA6FF; color: #1E1B3A; }
 .rank-row.top2 .rank-pos { background: #D9DCE8; color: #1E1B3A; }
 .rank-row.top3 .rank-pos { background: #F2B07A; color: #1E1B3A; }
 .rank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
@@ -1028,3 +990,68 @@ html.land .result .standings { margin: 2px 0; }
 html.land .result .standings li { padding: 5px 10px; }
 html.land .result .btn { min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
 html.land .result .xp-chip { font-size: .95rem; padding: 4px 12px; }
+
+/* 5 Cards hand: picked cards lift and stay still; press and drag to rearrange */
+.hand-card { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hand-card .pc { transition: transform .15s ease, box-shadow .15s ease; }
+.hand-card.picked .pc { transform: translateY(-16px); }
+.hand-card.idle { cursor: grab; }
+.hand-card.dragging .pc { transform: translateY(-8px) scale(1.06); box-shadow: 0 0 0 3px var(--cta), 0 14px 26px rgba(0, 0, 0, .35); }
+.hand-card.picked.dragging .pc { transform: translateY(-20px) scale(1.06); }
+@media (prefers-reduced-motion: reduce) { .hand-card .pc { transition: none; } }
+
+/* ===================== Small-phone fixes (2026-11-03 UI sweep) ===================== */
+.seg-btn:disabled { opacity: .4; cursor: not-allowed; }
+/* landing tiles: game names stay whole words; tiles shrink the text instead */
+@media (max-width: 400px) {
+  .landing-games li { font-size: .58rem; letter-spacing: -.01em; }
+  .landing-games li span { overflow-wrap: normal; word-break: keep-all; }
+}
+/* room top bar: one-line title with "…", smaller code pill and Leave on narrow phones */
+.room-bar-title b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 400px) {
+  .room-bar { gap: 8px; }
+  .room-bar .code-pill { height: 30px; padding: 0 8px; font-size: .82rem; letter-spacing: .02em; flex: none; }
+  .room-bar .code-pill .icon { display: none; }
+  .room-bar .btn-sm { padding: 0 8px; }
+}
+/* boards fit on short screens: never taller than the room left under the bars */
+.quilt { width: min(100%, 440px, max(220px, calc(100dvh - 385px))); margin-inline: auto; }
+.xo { width: min(100%, 380px, max(220px, calc(100dvh - 375px))); }
+/* 5 Cards upright on short phones: compact table so your hand and buttons stay on screen */
+@media (max-height: 760px) {
+  html:not(.land) .room-cards.in-game .ticker { display: none; }
+  html:not(.land) .room-cards .fc { gap: 8px; }
+  html:not(.land) .room-cards .fc-meta { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; padding-bottom: 2px; }
+  html:not(.land) .room-cards .fc-meta::-webkit-scrollbar { display: none; }
+  html:not(.land) .room-cards .fc-meta .chip { flex: none; font-size: .74rem; padding: 3px 9px; }
+  html:not(.land) .room-cards .felt { min-height: 0; padding: 10px 10px 12px; }
+  html:not(.land) .room-cards .fc-seats { margin-bottom: 6px; gap: 4px 10px; }
+  html:not(.land) .room-cards .felt .pc:not(.pc-sm) { --w: 50px; --h: 72px; }
+  html:not(.land) .room-cards .deck { width: 50px; height: 72px; }
+  html:not(.land) .room-cards .drop { min-height: 72px; }
+  html:not(.land) .room-cards .pile { gap: 4px; }
+  html:not(.land) .room-cards .pile-label { font-size: .72rem; }
+  html:not(.land) .room-cards .turn-banner { margin: 0; }
+  html:not(.land) .room-cards .hand { padding-top: 14px; }
+  html:not(.land) .room-cards .hand .pc-lg { --w: 54px; --h: 78px; }
+  html:not(.land) .room-cards .hand-area { padding-top: 10px; padding-bottom: 10px; }
+}
+/* table mode chips: big enough to tap */
+html.land .room-cards .fc-meta .chip-btn { min-height: 36px; padding: 4px 12px; }
+
+/* ===================== Pause ===================== */
+/* covers the board (below the room bar so Pause/Resume and Leave stay reachable); voice stays usable */
+.pause-screen { position: fixed; inset: 0; z-index: 18; display: grid; place-items: center; padding: 76px 16px calc(96px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.pause-card { width: min(100%, 360px); display: grid; justify-items: center; gap: 12px; text-align: center; padding: 22px 18px 18px;
+  background: var(--surface); border: var(--line-w) solid var(--outline); border-radius: 18px; box-shadow: var(--shadow-2); }
+.pause-card .muted { margin: 0; }
+.pause-badge { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--sun); color: #1E1B3A; border: 3px solid var(--outline); box-shadow: 0 4px 0 var(--outline); }
+.pause-auto { margin: 0; font-size: .82rem; color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* in Patches / 5 Cards the dock is a row in the page; while paused it floats above the cover again */
+html .app:has(.pause-screen) .room.in-game .voice-dock { position: fixed; z-index: 19; left: max(12px, env(safe-area-inset-left)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); margin: 0; }
+html.land .app:has(.pause-screen) .room.in-game .voice-dock { top: 58px; bottom: auto; }
+html.land .pause-screen { padding: 12px 16px 12px 80px; }
+/* narrow phones in a game: nobody can join any more, so the room code makes way for the pause button */
+@media (max-width: 400px) { .room.in-game .room-bar .code-pill { display: none; } }

@@ -13,8 +13,8 @@ async function fonts() {
   } catch {}
 }
 
-// Board-game box look, same as the app: sunny table, ink outlines, hard offset shadows.
-const INK = '#1E1B3A', SUN = '#FFD84D', PAPER = '#FFFFFF', CREAM = '#FFF3C4', RED = '#F0473A', BLUE = '#2449E0', MUTED = '#6E6890';
+// Board-game box look, same as the app: dark-blue table, ink outlines, hard offset shadows.
+const INK = '#07051A', TABLE = '#191538', PANEL = '#25204D', ROW = '#2E2860', TEXT = '#FFF6DE', MUTED = '#9B93C8', HI = '#8EA6FF', RED = '#FF5A4A', BLUE = '#6C86F5';
 const DISPLAY = '"Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif', SANS = '"Manrope", system-ui, sans-serif';
 
 function box(x, px, py, w, h, r, fill, shadow = 14, line = 7) {
@@ -36,20 +36,20 @@ export async function drawWinCard({ title, game, line, players = [], site }) {
   c.width = W; c.height = H;
   const x = c.getContext('2d');
 
-  // the table: yellow with a dot print
-  x.fillStyle = SUN; x.fillRect(0, 0, W, H);
-  x.fillStyle = 'rgba(30, 27, 58, .09)';
+  // the table: deep indigo with a dot print
+  x.fillStyle = TABLE; x.fillRect(0, 0, W, H);
+  x.fillStyle = 'rgba(255, 255, 255, .06)';
   for (let yy = 18; yy < H; yy += 36) for (let xx = 18; xx < W; xx += 36) { x.beginPath(); x.arc(xx, yy, 3, 0, Math.PI * 2); x.fill(); }
 
   // brand capsule + game sticker
-  box(x, 70, 64, 330, 92, 46, PAPER, 8, 6);
-  x.fillStyle = INK; x.font = `400 52px ${DISPLAY}`; x.textBaseline = 'middle';
+  box(x, 70, 64, 330, 92, 46, PANEL, 8, 6);
+  x.fillStyle = TEXT; x.font = `400 52px ${DISPLAY}`; x.textBaseline = 'middle';
   x.fillText('Playroom', 112, 112);
   x.font = `800 34px ${SANS}`;
   const gw = x.measureText(game).width + 64;
   x.save(); x.translate(W - 80 - gw / 2, 110); x.rotate(0.05);
   box(x, -gw / 2, -42, gw, 84, 42, RED, 8, 6);
-  x.fillStyle = PAPER; x.textAlign = 'center'; x.fillText(game, 0, 2); x.textAlign = 'left';
+  x.fillStyle = '#FFFFFF'; x.textAlign = 'center'; x.fillText(game, 0, 2); x.textAlign = 'left';
   x.restore();
 
   // the headline, printed like a box lid
@@ -57,11 +57,11 @@ export async function drawWinCard({ title, game, line, players = [], site }) {
   let size = 200; x.font = `400 ${size}px ${DISPLAY}`;
   while (x.measureText(title.toUpperCase()).width > W - 180 && size > 110) { size -= 10; x.font = `400 ${size}px ${DISPLAY}`; }
   x.save(); x.translate(W / 2, 200 + size * 0.85); x.rotate(-0.04); x.textAlign = 'center';
-  outlined(x, title.toUpperCase(), 0, 0, PAPER, 14, 12);
+  outlined(x, title.toUpperCase(), 0, 0, HI, 14, 12);
   x.restore();
 
   // the line, wrapped
-  x.fillStyle = INK; x.font = `800 46px ${SANS}`;
+  x.fillStyle = TEXT; x.font = `800 46px ${SANS}`;
   const words = line.split(' '); let row = '', y = 200 + size * 0.85 + 110;
   for (const w of words) {
     const t = row ? row + ' ' + w : w;
@@ -72,23 +72,23 @@ export async function drawWinCard({ title, game, line, players = [], site }) {
   // standings: one white card, the winner's row on the yellow
   const list = players.slice(0, 5);
   const top = Math.max(y + 60, 640), rowH = 104;
-  box(x, 70, top, W - 154, list.length * rowH + 40, 34, PAPER);
+  box(x, 70, top, W - 154, list.length * rowH + 40, 34, PANEL);
   list.forEach((p, i) => {
     const ry = top + 20 + i * rowH;
-    if (p.win) { x.beginPath(); x.roundRect(92, ry + 6, W - 198, rowH - 12, 22); x.fillStyle = CREAM; x.fill(); x.lineWidth = 4; x.strokeStyle = INK; x.stroke(); }
+    if (p.win) { x.beginPath(); x.roundRect(92, ry + 6, W - 198, rowH - 12, 22); x.fillStyle = HI; x.fill(); x.lineWidth = 4; x.strokeStyle = INK; x.stroke(); }
     // seat number disc
     x.beginPath(); x.arc(150, ry + rowH / 2, 30, 0, Math.PI * 2); x.fillStyle = p.win ? RED : BLUE; x.fill(); x.lineWidth = 4; x.strokeStyle = INK; x.stroke();
-    x.fillStyle = PAPER; x.font = `400 34px ${DISPLAY}`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = '#FFFFFF'; x.font = `400 34px ${DISPLAY}`; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillText(String(i + 1), 150, ry + rowH / 2 + 2);
     x.textAlign = 'left';
-    x.fillStyle = INK; x.font = `800 42px ${SANS}`;
+    x.fillStyle = p.win ? INK : TEXT; x.font = `800 42px ${SANS}`;
     x.fillText(p.name.length > 18 ? p.name.slice(0, 17) + '…' : p.name, 204, ry + rowH / 2);
     if (p.note) { x.fillStyle = p.win ? INK : MUTED; x.font = `800 32px ${SANS}`; x.textAlign = 'right'; x.fillText(p.note, W - 124, ry + rowH / 2); x.textAlign = 'left'; }
     x.textBaseline = 'alphabetic';
   });
 
   // footer: date and where to play
-  x.fillStyle = INK; x.textAlign = 'center';
+  x.fillStyle = TEXT; x.textAlign = 'center';
   x.font = `400 46px ${DISPLAY}`; x.fillText(site, W / 2, H - 110);
   x.font = `800 28px ${SANS}`;
   x.fillText(new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }), W / 2, H - 60);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { handPoints, validDrop } from '../../shared/fivecards.js';
 import { ask } from '../lib/confirm.js';
@@ -89,7 +89,7 @@ export function Cards({ state, send, now }) {
   const owner = g.openDrop.by ? name(g.openDrop.by) : null;
 
   const status = g.phase === 'roundover' ? null
-    : canDrop ? { title: 'Your turn', text: 'Drop one card or one set, or Show.' }
+    : canDrop ? { title: 'Your turn', text: g.canShow === false ? 'Drop one card or one set. You can Show from your next turn.' : 'Drop one card or one set, or Show.' }
     : canPick ? { title: 'Pick a card', text: 'Draw from the pile, or take one from the last drop.' }
     : { title: `${name(g.turn)}’s turn`, text: g.phase === 'pick' ? 'Picking a card…' : 'Thinking…' };
 
@@ -189,26 +189,14 @@ export function Cards({ state, send, now }) {
             <span className="kicker">Your hand</span>
             <span className="hand-points">{g.hand.length} {g.hand.length === 1 ? 'card' : 'cards'} · <b>{g.myPoints}</b> {g.myPoints === 1 ? 'point' : 'points'}</span>
           </div>
-          <div className="hand">
-            {g.hand.map((c, i) => {
-              const picked = sel.includes(c);
-              return (
-                <motion.button key={c} className={`hand-card${picked ? ' picked' : ''}`} disabled={!canDrop} aria-pressed={picked}
-                  onClick={() => toggle(c)} layout
-                  initial={{ y: 60, opacity: 0 }} animate={{ y: picked ? -18 : 0, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 420, damping: 30, delay: picked ? 0 : i * 0.03 }}>
-                  <PlayingCard c={c} size="lg" />
-                </motion.button>
-              );
-            })}
-          </div>
+          <Hand cards={g.hand} sel={sel} canDrop={canDrop} onToggle={toggle} round={g.round} />
           {canDrop && (
             <div className="action-bar">
               <button className="btn btn-primary" disabled={!selValid}
                 onClick={() => send({ type: 'move', move: { type: 'drop', cards: sel } })}>
                 {sel.length === 0 ? 'Select cards to drop' : selValid ? `Drop ${sel.length === 1 ? '1 card' : sel.length + ' cards'} · −${handPoints(sel)}` : 'Not a valid drop'}
               </button>
-              <button className="btn btn-danger" onClick={show}>Show</button>
+              <button className="btn btn-danger" onClick={show} disabled={g.canShow === false} title={g.canShow === false ? 'You can Show from your second turn' : undefined}>Show</button>
             </div>
           )}
           {canDrop && sel.length > 1 && !selValid && (
@@ -222,6 +210,78 @@ export function Cards({ state, send, now }) {
 
 // What the previous player picked up. A card taken from a drop was face up, so everyone
 // sees it; a card from the draw pile stays hidden.
+// Your hand. Tap a card to pick it for dropping (it lifts and stays put); press and drag a card
+// sideways to rearrange. The order is yours only (kept on this phone for the round): new cards go
+// on the right, dropped cards leave. Uses elementFromPoint, so it also works when table mode turns
+// the whole app sideways.
+function Hand({ cards, sel, canDrop, onToggle, round }) {
+  const [order, setOrder] = useState(cards);
+  // keep my order, drop cards that left, add new ones at the end. Worked out on every render (no
+  // memo): the practice engine updates the hand array in place, so its identity can't be trusted.
+  const have = new Set(cards);
+  const kept = order.filter(c => have.has(c));
+  const keptSet = new Set(kept);
+  const shown = [...kept, ...cards.filter(c => !keptSet.has(c))];
+  useEffect(() => { setOrder(cards); }, [round]);
+  const drag = useRef(null);
+  const [dragging, setDragging] = useState(null);
+
+  const cardAt = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    const btn = el && el.closest('.hand-card');
+    return btn ? Number(btn.dataset.card) : null;
+  };
+  const down = c => e => {
+    if (e.button > 0) return;
+    drag.current = { c, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+  };
+  const move = e => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    if (!d.moved) {
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 8) return;
+      d.moved = true; setDragging(d.c);
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    }
+    const over = cardAt(e.clientX, e.clientY);
+    if (over === null || over === d.c) return;
+    setOrder(() => {
+      const list = shown.filter(c => c !== d.c);
+      const at = list.indexOf(over);
+      const from = shown.indexOf(d.c), to = shown.indexOf(over);
+      list.splice(to > from ? at + 1 : at, 0, d.c);
+      return list;
+    });
+  };
+  const up = c => e => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || d.id !== e.pointerId) return;
+    if (d.moved) { setDragging(null); return; }
+    if (canDrop) onToggle(c);
+  };
+  const cancel = () => { drag.current = null; setDragging(null); };
+
+  return (
+    <div className="hand" onPointerMove={move} onPointerCancel={cancel} onLostPointerCapture={() => { if (drag.current && drag.current.moved) cancel(); }}>
+      {shown.map((c, i) => {
+        const picked = sel.includes(c);
+        return (
+          <motion.button key={c} type="button" data-card={c}
+            className={`hand-card${picked ? ' picked' : ''}${dragging === c ? ' dragging' : ''}${canDrop ? '' : ' idle'}`}
+            aria-pressed={picked} aria-disabled={!canDrop} aria-label={`${cardLabel(c)}${picked ? ', picked' : ''}. Drag to move.`}
+            onPointerDown={down(c)} onPointerUp={up(c)}
+            onClick={e => { if (e.detail === 0 && canDrop) onToggle(c); }} // keyboard (Enter/Space) and screen readers
+            onContextMenu={e => e.preventDefault()}
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: i * 0.03 }}>
+            <PlayingCard c={c} size="lg" />
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
 function PickNote({ pick, name }) {
   const who = name(pick.by);
   const from = pick.owner == null ? 'the opening card' : pick.owner === pick.by ? 'their own drop' : name(pick.owner) === 'You' ? 'your drop' : `${name(pick.owner)}’s drop`;

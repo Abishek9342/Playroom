@@ -28,7 +28,7 @@ export function WordChain({ state, send, error, now }) {
           </AnimatePresence>
         </div>
         <div className="wc-stats">
-          {g.scores && <div><b>{g.scores[state.you] || 0}<small>/{g.target || 250}</small></b><span>your points</span></div>}
+          {g.scores && <div><b>{g.scores[state.you] || 0}<small>/{g.target || 150}</small></b><span>your points</span></div>}
           <div><b>{total}</b><span>{total === 1 ? 'word' : 'words'}</span></div>
         </div>
       </div>

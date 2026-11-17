@@ -15,6 +15,7 @@ export function practiceHash(game, players, options = {}) {
   let h = `practice-${game}-${players}`;
   if (options.decks) h += `-d${options.decks}`;
   if (options.exitAt) h += `-e${options.exitAt}`;
+  if (options.target) h += `-t${options.target}`;
   if (options.board) h += `-b${options.board}`;
   if (options.bestOf) h += `-o${options.bestOf}`;
   return h;
@@ -143,9 +144,9 @@ function Settings({ game, canHost, guest, onGuide, onClose }) {
       )}
       {spec.imposters && (
         <div className="setting-row">
-          <div className="setting-label"><b>Imposters</b><span>Two needs 5+ players</span></div>
+          <div className="setting-label"><b>Imposters</b><span>{players >= 5 ? 'One or two fakers' : 'Two needs 5+ players'}</span></div>
           <Segmented id="imposters" label="Imposters" value={opts.imposters} onChange={v => setOpts(o => ({ ...o, imposters: v }))}
-            options={[{ value: 1, label: '1' }, ...(players >= 5 ? [{ value: 2, label: '2' }] : [])]} />
+            options={[{ value: 1, label: '1' }, { value: 2, label: '2', disabled: players < 5 }]} />
         </div>
       )}
       {spec.category && (
@@ -159,7 +160,7 @@ function Settings({ game, canHost, guest, onGuide, onClose }) {
       )}
       {spec.hint && (
         <div className="setting-row">
-          <div className="setting-label"><b>Imposter hint</b><span>Imposter sees the category</span></div>
+          <div className="setting-label"><b>Imposter hint</b><span>Imposter sees the category and sub-category</span></div>
           <Segmented id="hint" label="Imposter hint" value={opts.hint} onChange={v => setOpts(o => ({ ...o, hint: v }))}
             options={[{ value: 0, label: 'Off' }, { value: 1, label: 'On' }]} />
         </div>
@@ -176,6 +177,12 @@ function Settings({ game, canHost, guest, onGuide, onClose }) {
           <div className="setting-label"><b>Discussion</b><span>Chat and vote</span></div>
           <Stepper label="discussion time" value={opts.voteSecs} min={spec.voteSecs.min} max={spec.voteSecs.max} step={spec.voteSecs.step}
             onChange={v => setOpts(o => ({ ...o, voteSecs: v }))} format={v => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`} />
+        </div>
+      )}
+      {spec.target && (
+        <div className="setting-row">
+          <div className="setting-label"><b>Winning score</b><span>First to this many points wins</span></div>
+          <Stepper label="winning score" value={opts.target} min={spec.target.min} max={spec.target.max} step={spec.target.step} onChange={v => setOpts(o => ({ ...o, target: v }))} />
         </div>
       )}
       {spec.decks && (

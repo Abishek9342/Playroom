@@ -3,45 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { VoiceMesh } from '../lib/voice.js';
 import { Sheet } from './Sheet.jsx';
 import { Icon } from './Icon.jsx';
-import { REACTIONS } from '../../shared/reactions.js';
-
-// Live reactions per player: { [id]: { text, n } }, each shown for a few seconds.
-export function useReactions(subscribeReact) {
-  const [map, setMap] = useState({});
-  useEffect(() => {
-    if (!subscribeReact) return;
-    let n = 0;
-    return subscribeReact((from, r) => {
-      const key = ++n;
-      setMap(m => ({ ...m, [from]: { text: REACTIONS[r], n: key } }));
-      setTimeout(() => setMap(m => (m[from] && m[from].n === key ? (({ [from]: _, ...rest }) => rest)(m) : m)), 2800);
-    });
-  }, [subscribeReact]);
-  return map;
-}
-
-export function ReactButton({ send }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="react-wrap">
-      <AnimatePresence>
-        {open && (
-          <motion.div className="react-pop" role="menu" aria-label="Send a reaction" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }}>
-            {REACTIONS.map((t, i) => (
-              <button key={t} type="button" role="menuitem" className="react-opt" onClick={() => { send({ type: 'react', r: i }); setOpen(false); }}>{t}</button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <button type="button" className="vd-btn vd-react" aria-expanded={open} aria-label="Send a reaction" onClick={() => setOpen(o => !o)}>GG</button>
-    </div>
-  );
-}
 
 // Who's talking, for avatars anywhere in the room.
-export const VoiceContext = createContext({ speaking: new Set(), reactions: {} });
+export const VoiceContext = createContext({ speaking: new Set() });
 export const useSpeaking = id => useContext(VoiceContext).speaking.has(id);
-export const useReaction = id => (useContext(VoiceContext).reactions || {})[id] || null;
 
 const EMPTY = { on: false, micOn: true, ptt: false, holding: false, speakerOff: false, muted: new Set(), speaking: new Set(), error: '', resting: false, connected: [] };
 
@@ -88,7 +53,6 @@ export function VoiceDock({ state, snap, mesh, send }) {
             <Icon name={snap.speakerOff ? 'speaker-off' : 'speaker'} size={19} />
           </button>
         )}
-        <ReactButton send={send} />
         <button type="button" className="vd-btn vd-more" onClick={() => setOpen(true)} aria-label="Voice settings">
           <Icon name="users" size={17} /><span>{inVoice.length + (snap.on ? 1 : 0)}</span>
         </button>

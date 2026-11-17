@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useReducedMotion } from 'motion/react';
 
-const COLORS = ['#E2BC4A', '#19A588', '#F4F1E8', '#C9A227', '#7FC8B4'];
+const COLORS = ['#8EA6FF', '#19A588', '#F4F1E8', '#FF5A4A', '#7FC8B4'];
 
 // Tile-shaped confetti burst for wins.
 export function Confetti() {

@@ -129,17 +129,12 @@ export class GameRoom {
         break;
       }
       case 'rematch-decline': c.declineRematch(uid); break;
-      case 'voice': c.setVoice(uid, !!msg.on); break;
-      case 'react': {
-        const r = Number(msg.r);
-        if (!Number.isInteger(r) || r < 0 || r > 7 || !c.find(uid)) break;
-        this.lastReact = this.lastReact || new Map();
-        if (Date.now() - (this.lastReact.get(uid) || 0) < 1200) break;
-        this.lastReact.set(uid, Date.now());
-        const out = JSON.stringify({ type: 'react', from: uid, r });
-        for (const sock of this.conns.keys()) { try { sock.send(out); } catch {} }
+      case 'pause': case 'resume': {
+        const err = msg.type === 'pause' ? c.pause(uid) : c.resume(uid);
+        if (err) try { ws.send(JSON.stringify({ type: 'error', message: err })); } catch {}
         break;
       }
+      case 'voice': c.setVoice(uid, !!msg.on); break;
       case 'rtc': {
         // WebRTC setup (offer/answer/ICE) for voice chat, only between players in this room
         if (typeof msg.to !== 'string' || !c.find(msg.to) || !c.find(uid)) break;

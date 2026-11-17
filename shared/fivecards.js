@@ -9,6 +9,7 @@
 //   K-A-2). Runs take at most one joker. Same-rank sets need 2+ natural cards and no two naturals of the same suit.
 //   Then PICK exactly one: top of the draw pile, or any one card of the previous player's
 //   latest drop (the rest of that drop is buried).
+// - No Show on your first turn of a round (user's rule, 2026-11-06): from your second turn on.
 // - Instead of dropping, SHOW: round ends, all hands shown. Shower strictly lowest (valid
 //   show): shower +0, everyone else + their hand. If anyone has equal or fewer points
 //   (invalid show): shower +50, others +0.
@@ -129,6 +130,7 @@ export class FiveCards {
     this.phase = 'drop';
     this.turn = this.dealer;
     this.roundTurns = 0;
+    this.played = new Set(); // players who finished a turn this round (Show needs one)
     this.armTurn();
   }
 
@@ -154,6 +156,7 @@ export class FiveCards {
     if (id !== this.turn) return 'It’s not your turn.';
     if (m.type === 'show' || m.type === 'call') {
       if (this.phase !== 'drop') return 'You can only Show before you drop.';
+      if (!this.played.has(id)) return 'You can’t Show on your first turn. Drop a card this time.';
       this.show(id);
       return null;
     }
@@ -200,6 +203,7 @@ export class FiveCards {
   }
 
   endTurn(id) {
+    this.played.add(id);
     this.openDrop = { by: id, cards: this.pending || [] };
     this.pending = null;
     if (this.draw.length === 0) { this.draw = shuffle(this.buried); this.buried = []; }
@@ -245,7 +249,7 @@ export class FiveCards {
     return {
       round: this.round, decks: this.decks, threshold: this.threshold, turn: this.turn, phase: this.phase,
       deadline: this.deadline, turnMs: this.phase === 'roundover' ? ROUND_PAUSE_MS : FC_TURN_MS, dealer: this.dealer,
-      hand, myPoints: handPoints(hand),
+      hand, myPoints: handPoints(hand), canShow: this.played.has(forId),
       counts: Object.fromEntries(Object.entries(this.hands).map(([id, h]) => [id, h.length])),
       openDrop: this.openDrop, pending: this.pending, drawCount: this.draw.length, lastPick: this.lastPick,
       totals: this.totals, last: this.last,

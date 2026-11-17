@@ -42,10 +42,10 @@ function makeCtx(ids) {
   assert.equal(g.view().prev, null);
   t += 1000; assert.match(g.handle('b', { type: 'word', word: 'gnat' }) || '', /^$/);
   t += 1000; assert.equal(g.handle('a', { type: 'word', word: 'tea' }), '“tea” was already played. Words can’t repeat.', 'hidden words still block repeats');
-  // first to 250 wins
-  g.scores.a = 247;
-  t += 1000; assert.equal(g.handle('a', { type: 'word', word: 'tusk' }), null); // +5 -> 252
-  assert.deepEqual(ctx.result, { winner: 'a', text: 'Reached 250 points' });
+  // first to 150 (the default) wins
+  g.scores.a = 147;
+  t += 1000; assert.equal(g.handle('a', { type: 'word', word: 'tusk' }), null); // +5 -> 152
+  assert.deepEqual(ctx.result, { winner: 'a', text: 'Reached 150 points' });
   Date.now = realNow;
   console.log('word chain points ok');
 }
@@ -164,10 +164,25 @@ function makeCtx(ids) {
   xo.away('a', 'switched tabs');
   assert.equal(xo.find('a').away, true, 'shown as Away');
   assert.equal(xo.graces.size, 0, 'no elimination timer outside Word Chain');
-  xo.disconnect('b');
-  assert.equal(xo.find('b').alive, true, 'closing the page is not elimination either');
   xo.back('a');
   assert.equal(xo.find('a').away, false);
+  // connection gone (app killed / tab closed): Away, then out after DROP_MS; the other player wins
+  xo.disconnect('b');
+  assert.equal(xo.find('b').alive, true, 'not out the moment the socket drops');
+  assert.equal(xo.graces.size, 1, 'drop timer armed');
+  pending[pending.length - 1]();
+  assert.equal(xo.find('b').alive, false);
+  assert.equal(xo.status, 'over');
+  assert.equal(xo.result.winner, 'a', 'the player still here wins');
+  // reconnecting in time keeps you in
+  const x2 = new RoomCore({ token: 'Y', game: 'xo', size: 2, options: {} });
+  x2.join('a', 'A'); x2.join('b', 'B');
+  x2.disconnect('b'); x2.join('b', 'B');
+  assert.equal(x2.graces.size, 0); assert.equal(x2.find('b').away, false);
+  // closing the tab sends leave: out at once
+  x2.leave('b');
+  assert.equal(x2.result.winner, 'a');
+  x2.stopTimers();
   const wc = new RoomCore({ token: 'W', game: 'wordchain', size: 2, options: {} }, { isWord: () => true });
   wc.join('a', 'A'); wc.join('b', 'B');
   wc.away('b', 'switched tabs');
@@ -178,6 +193,47 @@ function makeCtx(ids) {
   globalThis.setTimeout = real;
   xo.stopTimers(); wc.stopTimers();
   console.log('presence ok');
+}
+// Pause: clock stops, moves wait, no Word Chain knockouts, resume continues the clock
+{
+  const realT = globalThis.setTimeout, realC = globalThis.clearTimeout, realNow = Date.now;
+  let t = 1e6; Date.now = () => t;
+  const timers = new Map(); let n = 0;
+  globalThis.setTimeout = (fn, ms) => { timers.set(++n, { fn, ms }); return n; };
+  globalThis.clearTimeout = id => timers.delete(id);
+  const wc = new RoomCore({ token: 'P', game: 'wordchain', size: 2, options: {} }, { isWord: () => true });
+  wc.join('a', 'A'); wc.join('b', 'B');
+  t += 10000; // a used 10 s of the 30 s turn
+  const d0 = wc.game.deadline;
+  assert.equal(wc.pause('b'), null, 'any player can pause, not just the one on turn');
+  assert.equal(wc.view('a').paused.name, 'B');
+  assert.equal(wc.timer, null, 'turn clock stopped');
+  assert.match(wc.move('a', { type: 'word', word: 'cat' }), /paused/);
+  wc.away('a', 'switched tabs');
+  assert.equal(wc.graces.size, 0, 'no knockout while paused');
+  t += 60000;
+  wc.back('a');
+  assert.equal(wc.resume('a'), null);
+  assert.equal(wc.paused, null);
+  assert.equal(wc.game.deadline, d0 + 60000, 'deadline moved by the pause');
+  assert.equal(timers.get(wc.timer).ms, 20000, 'the turn has its 20 s left');
+  assert.equal(wc.move('a', { type: 'word', word: 'cat' }), null);
+  assert.equal(wc.game.words[0].secs, 10, 'the pause doesn’t count as answer time');
+  // away during the pause: after resuming they get the normal grace, not instant knockout
+  wc.pause('a'); wc.away('b', 'switched tabs'); t += 5000; wc.resume('a');
+  assert.equal(wc.find('b').alive, true); assert.equal(wc.graces.size, 1);
+  wc.back('b'); assert.equal(wc.graces.size, 0);
+  // the pause runs out by itself
+  wc.pause('a');
+  const auto = [...timers.values()].find(x => x.ms === 10 * 60e3);
+  assert.ok(auto, 'auto-resume armed'); auto.fn();
+  assert.equal(wc.paused, null);
+  // out players and finished games can't pause
+  wc.leave('b');
+  assert.equal(wc.status, 'over');
+  assert.match(wc.pause('a'), /isn’t running/);
+  globalThis.setTimeout = realT; globalThis.clearTimeout = realC; Date.now = realNow;
+  console.log('pause ok');
 }
 // Rematch: everyone votes, same seats and settings play again
 {
@@ -293,7 +349,7 @@ for (let t = 0; t < 2000; t++) {
     const g = ctx.game = createGame('cards', ctx); g.start();
     const make = n => { const h = []; while (n >= 10) { h.push(C(10, h.length % 4)); n -= 10; } if (n) h.push(C(n, 3)); return h; };
     ids.forEach((id, i) => { g.hands[id] = make(pts[i]); });
-    g.turn = ids[callerIdx]; g.phase = 'drop';
+    g.turn = ids[callerIdx]; g.phase = 'drop'; g.played = new Set(ids);
     assert.equal(g.handle(ids[callerIdx], { type: 'show' }), null);
     return g;
   };
@@ -315,6 +371,10 @@ for (let t = 0; t < 2000; t++) {
     assert.equal(g.turn, 'a'); // dealer plays first
     assert.equal(g.hands.a.length, 5);
     assert.equal(g.handle('b', { type: 'show' }), 'It’s not your turn.');
+    // no Show on your first turn of the round
+    assert.equal(g.view('a').canShow, false);
+    assert.match(g.handle('a', { type: 'show' }), /first turn/);
+    assert.equal(g.phase, 'drop');
     assert.match(g.handle('a', { type: 'pick', from: 'draw' }), /Drop first/);
     const opening = g.openDrop.cards[0];
     assert.equal(g.handle('a', { type: 'drop', cards: [g.hands.a[0]] }), null);
@@ -327,6 +387,10 @@ for (let t = 0; t < 2000; t++) {
     assert.equal(g.handle('b', { type: 'drop', cards: [g.hands.b[0]] }), null);
     assert.equal(g.handle('b', { type: 'pick', from: 'draw' }), null);
     assert.ok(g.buried.includes(aDrop), 'untaken drop is buried');
+    // second turn: Show is allowed again (b also had a turn: shows work for both now)
+    assert.equal(g.turn, 'a');
+    assert.equal(g.view('a').canShow, true);
+    assert.equal(g.view('b').canShow, true);
     // timeout auto-plays (drop highest + draw)
     ctx.timerFn();
     assert.equal(g.turn, 'b');
@@ -341,7 +405,7 @@ for (let t = 0; t < 2000; t++) {
     const ctx = makeCtx(['a', 'b']);
     const g = ctx.game = createGame('cards', ctx); g.start();
     g.totals.a = 160;
-    g.hands.a = [C(9, 0)]; g.hands.b = [C(1, 0)]; g.turn = 'a'; g.phase = 'drop';
+    g.hands.a = [C(9, 0)]; g.hands.b = [C(1, 0)]; g.turn = 'a'; g.phase = 'drop'; g.played.add('a');
     g.handle('a', { type: 'show' });
     assert.equal(g.totals.a, 210);
     assert.equal(ctx.result.winner, 'b');
@@ -384,6 +448,17 @@ for (let t = 0; t < 2000; t++) {
   }
   // Host settings: decks and exit point
   {
+    assert.deepEqual(normalizeOptions('wordchain', 3, {}).options, { target: 150 });
+    assert.deepEqual(normalizeOptions('wordchain', 3, { target: 300 }).options, { target: 300 });
+    assert.ok(normalizeOptions('wordchain', 3, { target: 120 }).error, 'steps of 50');
+    assert.ok(normalizeOptions('wordchain', 3, { target: 600 }).error);
+    {
+      const c2 = makeCtx(['a', 'b']);
+      const w = c2.game = createGame('wordchain', c2, { options: { target: 50 } }); w.start();
+      assert.equal(w.view().target, 50);
+      w.scores.a = 48; assert.equal(w.handle('a', { type: 'word', word: 'cat' }), null);
+      assert.deepEqual(c2.result, { winner: 'a', text: 'Reached 50 points' });
+    }
     assert.deepEqual(normalizeOptions('cards', 4, {}).options, { decks: 1, exitAt: 200 });
     assert.deepEqual(normalizeOptions('cards', 6, {}).options, { decks: 2, exitAt: 200 });
     assert.deepEqual(normalizeOptions('cards', 3, { decks: 3, exitAt: 100 }).options, { decks: 3, exitAt: 100 });
@@ -394,7 +469,7 @@ for (let t = 0; t < 2000; t++) {
     const g = ctx.game = createGame('cards', ctx, { options: { decks: 3, exitAt: 100 } }); g.start();
     assert.equal(g.decks, 3);
     assert.equal(g.draw.length, 165 - 15 - 1);
-    g.totals.a = 60; g.hands.a = [(9 - 1) * 4]; g.hands.b = [0]; g.hands.c = [1]; g.turn = 'a'; g.phase = 'drop';
+    g.totals.a = 60; g.hands.a = [(9 - 1) * 4]; g.hands.b = [0]; g.hands.c = [1]; g.turn = 'a'; g.phase = 'drop'; g.played.add('a');
     g.handle('a', { type: 'show' });
     assert.equal(g.totals.a, 110);
     assert.ok(!ctx.alive().includes('a'), 'out at the host’s exit point (100)');
@@ -435,6 +510,7 @@ for (let t = 0; t < 2000; t++) {
   // secrets: the Imposter never sees the word (or the category without a hint); crew never sees who
   assert.equal(g.view(imp).word, null);
   assert.equal(g.view(imp).category, null);
+  assert.equal(g.view(imp).group, null); // no sub-category hint either
   assert.equal(g.view(imp).role, 'imposter');
   for (const c of crew) { assert.equal(g.view(c).word, g.word); assert.equal(g.view(c).imposters, null); assert.equal(g.view(c).role, 'crew'); }
   assert.ok(!JSON.stringify(g.view(imp)).includes(`"${g.word}"`), 'word not anywhere in the Imposter view');
@@ -510,6 +586,8 @@ for (let t = 0; t < 2000; t++) {
   ({ ctx, g } = mk(['a', 'b', 'c', 'd', 'e'], { imposters: 2, hint: 1 }));
   const [i1, i2] = g.imposters;
   assert.equal(g.view(i1).category, g.category);
+  assert.equal(g.view(i1).group, g.group); // the sub-category ("Indoor games") is part of the hint
+  assert.ok(g.group);
   assert.equal(g.view(i1).word, null);
   assert.deepEqual([...g.view(i1).imposters].sort(), [i1, i2].sort());
   assert.equal(normalizeOptions('imposter', 4, { imposters: 2 }).error, 'Two Imposters need at least 5 players.');
@@ -537,4 +615,28 @@ for (let t = 0; t < 2000; t++) {
   assert.equal(x.prevDay('2026-11-01'), '2026-10-31');
   assert.equal(x.levelTitle(1), 'Rookie'); assert.equal(x.levelTitle(9), 'Pro');
   console.log('xp ok');
+}
+
+// Imposter words: 10 categories x 40, every word in exactly one sub-category; Sports by where it's played
+{
+  const { IMPOSTER_CATEGORIES, groupOf } = await import('../shared/imposterWords.js');
+  const { pickSecret } = await import('../shared/games.js');
+  assert.equal(IMPOSTER_CATEGORIES.length, 10);
+  const all = [];
+  for (const c of IMPOSTER_CATEGORIES) {
+    assert.equal(c.words.length, 40, c.name);
+    assert.equal(c.groups.reduce((n, g) => n + g.words.length, 0), 40, c.name);
+    all.push(...c.words.map(w => w.toLowerCase()));
+  }
+  assert.equal(new Set(all).size, all.length, 'no word in two places');
+  const sports = IMPOSTER_CATEGORIES.find(c => c.name === 'Sports');
+  assert.deepEqual(sports.groups.map(g => g.name), ['Water sports', 'Winter sports', 'Indoor games', 'Outdoor games']);
+  assert.equal(groupOf('Sports', 'chess'), 'Indoor games');
+  assert.equal(groupOf('Sports', 'skiing'), 'Winter sports');
+  for (let i = 0; i < 200; i++) {
+    const s = pickSecret(10); // Sports only
+    assert.equal(s.category, 'Sports');
+    assert.ok(sports.groups.find(g => g.name === s.group).words.includes(s.word), `${s.word} in ${s.group}`);
+  }
+  console.log('imposter words ok');
 }

@@ -49,6 +49,7 @@ export class LocalRoom {
     else if (msg.type === 'visible') c.back(this.me);
     else if (msg.type === 'leave') c.leave(this.me);
     else if (msg.type === 'rematch-decline') c.declineRematch(this.me);
+    else if (msg.type === 'pause' || msg.type === 'resume') { const err = msg.type === 'pause' ? c.pause(this.me) : c.resume(this.me); if (err) this.onError(err); }
     else if (msg.type === 'rematch') {
       // forget last game's pending bot moves before the board resets
       this.timeouts.forEach(clearTimeout); this.timeouts.clear(); this.scheduled.clear();
@@ -64,7 +65,7 @@ export class LocalRoom {
 
   scheduleBots() {
     const c = this.core;
-    if (c.status !== 'playing') return;
+    if (c.status !== 'playing' || c.paused) return;
     const g = c.game;
     for (const p of c.players) {
       if (!p.bot || !p.alive) continue;
@@ -85,7 +86,8 @@ export class LocalRoom {
       const k = p.id + ':' + key;
       if (this.scheduled.has(k)) continue;
       this.scheduled.add(k);
-      this.later(delay, () => { if (c.status === 'playing' && c.find(p.id).alive) act(); });
+      // paused meanwhile: forget this move; resuming schedules a fresh one
+      this.later(delay, () => { if (c.paused) { this.scheduled.delete(k); return; } if (c.status === 'playing' && c.find(p.id).alive) act(); });
     }
   }
 

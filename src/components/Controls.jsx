@@ -19,7 +19,7 @@ export function Segmented({ options, value, onChange, label, id }) {
   return (
     <div className="seg" role="radiogroup" aria-label={label}>
       {options.map(o => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} className="seg-btn" onClick={() => onChange(o.value)}>
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} className="seg-btn" disabled={!!o.disabled} onClick={() => onChange(o.value)}>
           <span>{o.label}</span>
         </button>
       ))}

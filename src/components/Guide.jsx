@@ -24,9 +24,14 @@ function Section({ title, children }) {
   return <section className="g-section"><h3>{title}</h3>{children}</section>;
 }
 function Leaving({ strict }) {
-  return strict
-    ? <p className="note"><Icon name="info" size={16} /> Stay on the game screen. Switching apps or tabs for more than 3 seconds takes you out, and the last player standing wins.</p>
-    : <p className="note"><Icon name="info" size={16} /> You can switch apps and come back: you’re shown as Away meanwhile. Your turn timer keeps running, so don’t stay away too long.</p>;
+  return (
+    <>
+      {strict
+        ? <p className="note"><Icon name="info" size={16} /> Stay on the game screen. Switching apps or tabs for more than 3 seconds takes you out, and the last player standing wins.</p>
+        : <p className="note"><Icon name="info" size={16} /> You can switch apps and come back: you’re shown as Away meanwhile, and your turn timer keeps running. Closing the tab or leaving the game takes you out (in a 2-player game the other player wins), and so does losing the connection for 30 seconds.</p>}
+      <p className="note"><Icon name="pause" size={16} /> Need a break? Tap the pause button at the top. The clock stops for everyone{strict ? ' and nobody is knocked out for leaving the screen' : ''}. Any player can tap Resume; after 10 minutes the game resumes by itself.</p>
+    </>
+  );
 }
 function MiniBoard({ n, cells }) {
   return (
@@ -39,7 +44,7 @@ function MiniBoard({ n, cells }) {
 const GUIDES = {
   wordchain: () => (
     <>
-      <p className="g-goal">Keep the chain going and score points for speed. First to 250 points wins. Miss your turn and you’re out; if everyone else is out, you win.</p>
+      <p className="g-goal">Keep the chain going and score points for speed. First to the winning score (150 points unless the host changes it) wins. Miss your turn and you’re out; if everyone else is out, you win.</p>
       <div className="g-chain" aria-label="Example chain: apple, eagle, elephant, tiger">
         {['apple', 'eagle', 'elephant', 'tiger'].map((w, i) => (
           <span key={w} className="g-word-wrap">
@@ -63,7 +68,7 @@ const GUIDES = {
           <div><b className="g-big">+2</b><span>within 15 seconds</span></div>
           <div><b className="g-big">+1</b><span>within 30 seconds</span></div>
         </div>
-        <p className="g-text">Every valid word scores. The clock starts when your turn starts, and your total shows on your avatar. <b>The first player to reach 250 points wins.</b></p>
+        <p className="g-text">Every valid word scores. The clock starts when your turn starts, and your total shows on your avatar. <b>The first player to reach the winning score wins.</b> It’s 150 points by default; the host can set it from 50 to 500 when creating the room.</p>
       </Section>
       <Section title="Tips">
         <ul className="g-tips">
@@ -138,7 +143,7 @@ const GUIDES = {
       <p className="g-goal">Everyone gets the same secret word, except the Imposter. Give clues that show you know the word, then work out who’s faking it.</p>
       <Section title="How a round works">
         <ol className="g-steps">
-          <Step n={1} title="Look at your card">Tap your card to see it. You get the secret word, or you’re told you’re the Imposter (with the category as a hint, if the host turned it on).</Step>
+          <Step n={1} title="Look at your card">Tap your card to see it. You get the secret word, or you’re told you’re the Imposter (with the category and sub-category as a hint, like “Sports › Indoor games”, if the host turned it on).</Step>
           <Step n={2} title="Give one-word clues">Take turns typing one word about the secret word. Not the word itself, and no repeats. You have 30 seconds a clue.</Step>
           <Step n={3} title="Talk and vote">Chat about whose clue didn’t fit, then vote. You can change your vote until everyone has voted.</Step>
           <Step n={4} title="Last chance">If the Imposter is caught, they get one guess at the secret word. Right, and the Imposter still wins.</Step>
@@ -177,7 +182,7 @@ const GUIDES = {
         <ol className="g-steps">
           <Step n={1} title="Drop">Throw away one card, or one set. Only one set per turn, never two at once.</Step>
           <Step n={2} title="Pick">Take the top card of the draw pile, or one card from the previous player’s drop. Everyone sees which card you take from a drop.</Step>
-          <Step n={3} title="Or Show instead">Think your hand is the lowest at the table? Tap Show instead of dropping.</Step>
+          <Step n={3} title="Or Show instead">Think your hand is the lowest at the table? Tap Show instead of dropping. Not on your first turn of a round: you can Show from your second turn on.</Step>
         </ol>
       </Section>
       <Section title="Sets you can drop">

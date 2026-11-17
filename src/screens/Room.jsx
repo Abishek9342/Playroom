@@ -13,7 +13,7 @@ import { Sheet } from '../components/Sheet.jsx';
 import { GuideBody } from '../components/Guide.jsx';
 import { copyText } from '../lib/clipboard.js';
 import { buzz, vibrateOn, setVibrate, onVibrate } from '../lib/haptics.js';
-import { VoiceContext, VoiceDock, useVoice, useReactions } from '../components/VoiceDock.jsx';
+import { VoiceContext, VoiceDock, useVoice } from '../components/VoiceDock.jsx';
 import { drawWinCard, shareWinCard } from '../lib/winCard.js';
 import { TURN_MS } from '../../shared/games.js';
 import { WordChain } from '../games/WordChain.jsx';
@@ -40,11 +40,10 @@ export function PracticeRoom({ game, size, name, options }) {
   return <Table {...room} practice />;
 }
 
-function Table({ state, send, fatal, error, offset, practice, subscribeRtc, subscribeReact }) {
+function Table({ state, send, fatal, error, offset, practice, subscribeRtc }) {
   const lastErr = useRef(0);
   const voice = useVoice(practice ? null : state, send, practice ? null : subscribeRtc);
-  const reactions = useReactions(practice ? null : subscribeReact);
-  const ctxValue = { ...voice.snap, reactions };
+  const ctxValue = voice.snap;
   const [guide, setGuide] = useState(false);
   useEffect(() => { if (error && error.n !== lastErr.current) { lastErr.current = error.n; toast(error.message); } }, [error]);
 
@@ -64,6 +63,7 @@ function Table({ state, send, fatal, error, offset, practice, subscribeRtc, subs
 
   async function back() {
     if (playing && !(await ask(LEAVE))) return;
+    if (playing) send({ type: 'leave' }); // leaving the room = out of the game, not just Away
     location.hash = '';
   }
 
@@ -82,6 +82,11 @@ function Table({ state, send, fatal, error, offset, practice, subscribeRtc, subs
           </button>
         )}
         <button className="icon-btn" onClick={() => setGuide(true)} aria-label={`How to play ${g.name}`}><Icon name="help" /></button>
+        {playing && (
+          <button className="icon-btn" onClick={() => send({ type: state.paused ? 'resume' : 'pause' })} aria-label={state.paused ? 'Resume the game' : 'Pause the game'} aria-pressed={!!state.paused}>
+            <Icon name={state.paused ? 'play' : 'pause'} />
+          </button>
+        )}
         {state.status === 'playing' && me && me.alive && (
           <button className="btn btn-quiet btn-sm" onClick={async () => { if (await ask(LEAVE)) send({ type: 'leave' }); }}>Leave</button>
         )}
@@ -204,7 +209,9 @@ function Countdown({ onDone }) {
 }
 
 function Game({ state, send, offset, error, practice }) {
-  const now = useNow(offset, 100);
+  const live = useNow(offset, 100);
+  const now = state.paused ? state.paused.at : live; // paused: every clock on screen stops
+
   const Board = BOARDS[state.game];
   const g = state.g || {};
   const me = state.players.find(p => p.id === state.you);
@@ -254,11 +261,34 @@ function Game({ state, send, offset, error, practice }) {
         <div className="banner banner-danger" role="status"><Icon name="flag" size={18} /> You’re out: you {me.reason}. You can keep watching.</div>
       )}
       <Board state={state} send={send} now={now} error={error} />
+      <AnimatePresence>{state.paused && state.status === 'playing' && <Paused key="paused" state={state} send={send} now={live} me={me} />}</AnimatePresence>
       <AnimatePresence>{counting && <Countdown key="cd" onDone={() => setCounting(false)} />}</AnimatePresence>
       <AnimatePresence>{spot > 0 && myTurn && <motion.div key={'spot' + spot} className={`spotlight${left <= 5 ? ' urgent' : ''}`} aria-hidden="true"
         initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0.55] }} exit={{ opacity: 0 }} transition={{ duration: 0.9 }} />}</AnimatePresence>
       <AnimatePresence>{state.status === 'over' && <Result key={'r' + (state.match || 0)} state={state} send={send} practice={practice} />}</AnimatePresence>
       {state.status === 'over' && <RematchRequest state={state} send={send} />}
+    </motion.div>
+  );
+}
+
+// Pause screen: covers the board (no free thinking or solving time) until someone taps Resume.
+function Paused({ state, send, now, me }) {
+  const p = state.paused;
+  const left = Math.max(0, Math.ceil((p.until - now) / 1000));
+  const who = p.by === state.you ? 'You' : p.name;
+  const canResume = !!me && me.alive;
+  return (
+    <motion.div className="pause-screen" role="dialog" aria-modal="true" aria-labelledby="pause-title"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+      <motion.div className="pause-card" initial={{ y: 16, scale: 0.97 }} animate={{ y: 0, scale: 1 }} exit={{ y: 8, opacity: 0 }}>
+        <span className="pause-badge" aria-hidden="true"><Icon name="pause" size={30} /></span>
+        <h2 id="pause-title" className="h-section">Game paused</h2>
+        <p className="muted">{who} paused the game. The clock is stopped and nobody can play until it resumes.{state.game === 'wordchain' ? ' You can leave the screen without being knocked out.' : ''}</p>
+        {canResume
+          ? <button className="btn btn-primary btn-block" onClick={() => send({ type: 'resume' })}><Icon name="play" size={18} /> Resume</button>
+          : <p className="note"><Icon name="info" size={16} /> Waiting for a player to resume.</p>}
+        <p className="pause-auto">Resumes by itself in {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</p>
+      </motion.div>
     </motion.div>
   );
 }

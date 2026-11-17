@@ -1,5 +1,5 @@
 import { FiveCards } from './fivecards.js';
-import { IMPOSTER_CATEGORIES } from './imposterWords.js';
+import { IMPOSTER_CATEGORIES, groupOf } from './imposterWords.js';
 
 // Server-side rules for every game. The server is the referee:
 // clients only send moves, and every move is checked here.
@@ -17,6 +17,9 @@ export const GAMES = {
 
 // Host-chosen room settings (beyond the player count), per game.
 export const OPTIONS = {
+  wordchain: {
+    target: { min: 50, max: 500, step: 50, label: 'Winning score' },
+  },
   xo: {
     board: { min: 3, max: 5, step: 2, label: 'Board size' },
     bestOf: { min: 1, max: 5, step: 2, label: 'Best of' },
@@ -35,6 +38,7 @@ export const OPTIONS = {
 };
 export function defaultOptions(game, players) {
   if (game === 'cards') return { decks: players >= 6 ? 2 : 1, exitAt: 200 };
+  if (game === 'wordchain') return { target: WC_TARGET };
   if (game === 'xo') return { board: 3, bestOf: 1 };
   if (game === 'imposter') return { imposters: 1, category: 0, hint: 1, laps: 2, voteSecs: 90 };
   return {};
@@ -61,7 +65,7 @@ export const TURN_MS = 20000; // time per turn / per card round
 // opts.isWord(word) -> boolean: dictionary check for Word Chain.
 export function createGame(kind, ctx, opts = {}) {
   switch (kind) {
-    case 'wordchain': return new WordChain(ctx, opts.isWord);
+    case 'wordchain': return new WordChain(ctx, opts.isWord, opts.options || {});
     case 'xo': return new XO(ctx, opts.options || {});
     case 'patches': return new Patches(ctx);
     case 'cards': return new FiveCards(ctx, opts.options || {});
@@ -88,15 +92,17 @@ function nextAlive(ctx, from) {
 export const WC_TURN_MS = 30000;
 export const WC_POINTS = [[5000, 5], [10000, 3], [15000, 2]]; // within ms -> points; later = 1
 export const wordPoints = ms => (WC_POINTS.find(([limit]) => ms <= limit) || [0, 1])[1];
-// First to WC_TARGET points wins (user's rule, 2026-10-31); last player standing still wins too.
-export const WC_TARGET = 250;
+// First to the winning score wins (user's rule, 2026-10-31); last player standing still wins too.
+// The host sets it (50-500, default 150, user's rule 2026-11-06).
+export const WC_TARGET = 150;
 // A "set" is one lap of the table: every player still in plays once. Screens show only the current
 // set; the no-repeat rule still covers every word of the whole game.
 
 class WordChain {
-  constructor(ctx, isWord) {
+  constructor(ctx, isWord, options = {}) {
     this.ctx = ctx;
     this.isWord = isWord || (() => true);
+    this.target = options.target || WC_TARGET;
     this.words = [];          // [{w, by, pts, secs, set}]
     this.set = 1;
     this.setPlays = 0;        // words played in the current set
@@ -128,7 +134,7 @@ class WordChain {
     const pts = wordPoints(ms);
     this.scores[id] = (this.scores[id] || 0) + pts;
     this.words.push({ w, by: id, pts, secs: Math.round(ms / 100) / 10, set: this.set });
-    if (this.scores[id] >= WC_TARGET) { this.ctx.finish(id, `Reached ${WC_TARGET} points`); return null; }
+    if (this.scores[id] >= this.target) { this.ctx.finish(id, `Reached ${this.target} points`); return null; }
     if (++this.setPlays >= this.ctx.alive().length) { this.set++; this.setPlays = 0; }
     this.turn = nextAlive(this.ctx, id);
     this.arm();
@@ -142,7 +148,7 @@ class WordChain {
     // between sets the list would be empty, so keep the word the next player must follow on from
     const prev = current.length === 0 && this.words.length ? this.words[this.words.length - 1] : null;
     return {
-      words: current, prev, set: this.set, total: this.words.length, target: WC_TARGET,
+      words: current, prev, set: this.set, total: this.words.length, target: this.target,
       turn: this.turn, deadline: this.deadline, turnMs: WC_TURN_MS, turnStart: this.turnStart, need: this.need(), scores: this.scores,
     };
   }
@@ -365,7 +371,8 @@ const shuffleArr = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd
 export function pickSecret(category = 0) {
   const cats = category ? [IMPOSTER_CATEGORIES[category - 1]] : IMPOSTER_CATEGORIES;
   const cat = cats[rnd(cats.length)];
-  return { category: cat.name, word: cat.words[rnd(cat.words.length)] };
+  const word = cat.words[rnd(cat.words.length)];
+  return { category: cat.name, group: groupOf(cat.name, word), word }; // group = the Imposter's sub-category hint
 }
 
 class Imposter {
@@ -529,6 +536,7 @@ class Imposter {
       role: seated ? (imp ? 'imposter' : 'crew') : null,
       word: !imp || over ? this.word : null,
       category: !imp || this.opts.hint || over ? this.category : null,
+      group: !imp || this.opts.hint || over ? this.group : null, // "Indoor games" for chess
       imposters: imp || over ? this.imposters : null, // Imposters know each other
       impostersCount: this.imposters.length,
       clues: this.clues,
