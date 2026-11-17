@@ -1,5 +1,20 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-11-17 Pre-LinkedIn checks: committed + pushed, free-plan usage, live phone test
+- Committed all work since bb3b5a8 as a5062f1 and pushed to main (repo is public). Local build bundle
+  index-B3G0WnW5.js = live bundle, so GitHub matches production (version 5b9360bf).
+- Usage, last 7 days (Cloudflare GraphQL + `wrangler d1 info`): Worker <= 208 requests/day (free 100,000),
+  DO <= 25 requests/day, DO active time <= ~3,600 s/day = ~460 GB-s (free 13,000 GB-s/day), D1 156 kB,
+  ~1,800 rows read/day (free 5M). Limits reset 00:00 UTC; over a limit, those calls fail until reset.
+- RISK for a traffic spike: worker/room.js uses `server.accept()` (standard WebSocket API), so a room is billed
+  128 MB for the WHOLE time any socket is open, idle lobbies and Away tabs included: 13,000 GB-s = ~28 room-hours
+  a day. Fix if needed: WebSocket Hibernation API (`state.acceptWebSocket` + webSocketMessage/Close handlers)
+  and/or close idle lobby sockets after N minutes. Practice and pass-and-play use no server time.
+- Live phone test (Playwright, touch, 360x640 and 390x844, no accounts created): every screen loads, no page
+  errors, no horizontal scroll; XO played to Victory/Rematch, Word Chain word scored (+5) and bot replied,
+  5 Cards drop + draw. Only "error" is GET /api/me 401 for signed-out visitors (expected).
+- NOT tested live: an online 2-player room (would need test accounts in prod D1). Owner to try with a friend.
+
 ## 2026-11-06 Imposter: 10 new categories x 40 words, sub-category hint (chess -> "Sports › Indoor games") — DEPLOYED 2026-11-06 (version 5b9360bf)
 - shared/imposterWords.js replaced: Transport, Electronic gadgets, Accessories, Animals, Jobs, Things at home,
   Places, Food snacks & desserts, Home appliances, Sports (user's list, filled to 40 each). Each category has
