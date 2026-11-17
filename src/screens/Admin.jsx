@@ -79,6 +79,7 @@ export function Admin({ user }) {
 
   const t = data && data.totals;
   const maxPlays = data ? Math.max(1, ...data.games.map(g => g.plays)) : 1;
+  const maxVisits = data && data.visits ? Math.max(1, ...data.visits.days.map(d => d.visitors)) : 1;
   return (
     <div className="admin">
       <header className="admin-head">
@@ -98,6 +99,8 @@ export function Admin({ user }) {
       {t && (
         <>
           <section className="admin-kpis" aria-label="Totals">
+            {data.visits && <Kpi label="Visitors today" value={data.visits.today}
+              note={`${data.visits.yesterday} yesterday · ${data.visits.week} this week`} />}
             <Kpi label="Players" value={t.accounts} note={`+${t.newWeek} this week`} />
             <Kpi label="Guests" value={t.guests} note="joined with a name" />
             <Kpi label="Games played" value={t.plays} note="online, finished" />
@@ -115,6 +118,22 @@ export function Admin({ user }) {
               <p className="muted"><b>{gb(data.voice.bytes)}</b> of {gb(data.voice.cap)} used. {data.voice.relay
                 ? 'At the cap the relay pauses until next month; direct voice keeps working. Cloudflare’s free allowance is 1,000 GB.'
                 : 'Relay not set up yet: voice uses direct connections only.'}</p>
+            </section>
+          )}
+
+          {data.visits && (
+            <section className="card admin-visits">
+              <div className="list-head"><h2 className="h-section">Daily visitors</h2><span className="count">last 14 days</span></div>
+              <ul className="bars">
+                {[...data.visits.days].reverse().map(d => (
+                  <li key={d.day} title={`${d.visitors} devices opened Playroom, ${d.signedIn} of them signed in`}>
+                    <span className="bar-label">{d.day === data.visits.todayKey ? 'Today' : dayLabel(d.day)}</span>
+                    <span className="bar-track"><motion.span className="bar-fill" initial={{ width: 0 }} animate={{ width: `${(d.visitors / maxVisits) * 100}%` }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} /></span>
+                    <span className="bar-value"><b>{d.visitors}</b> · {d.signedIn} signed in</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="muted">One count per phone or browser per day (India time). People who never opened the app aren’t counted, and nothing personal is stored.</p>
             </section>
           )}
 
@@ -190,6 +209,11 @@ export function Admin({ user }) {
       </Sheet>
     </div>
   );
+}
+
+// "2026-11-16" -> "Mon 16 Nov"
+function dayLabel(day) {
+  return new Date(day + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
 function Kpi({ label, value, note }) {

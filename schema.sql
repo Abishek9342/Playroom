@@ -65,3 +65,14 @@ CREATE TABLE IF NOT EXISTS daily_runs (
   PRIMARY KEY (user_id, day)
 );
 CREATE INDEX IF NOT EXISTS daily_runs_day ON daily_runs(day);
+
+-- Daily visitors for the admin panel (2026-11-17). Safe to run on any database (CREATE IF NOT EXISTS).
+-- One row per device per day (India time). vid = a random id the app keeps on the device: no IP,
+-- no name. signed_in = 1 if that device was signed in at any point that day.
+CREATE TABLE IF NOT EXISTS visits (
+  day        TEXT NOT NULL,
+  vid        TEXT NOT NULL,
+  first_at   INTEGER NOT NULL,
+  signed_in  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, vid)
+);

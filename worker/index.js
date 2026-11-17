@@ -249,7 +249,21 @@ async function handleAdmin(req, env, path) {
     for (const r of favs.results) if (!fav[r.user_id] || r.n > fav[r.user_id].n) fav[r.user_id] = r;
     const playMs = users.results.reduce((t, u) => t + u.play_ms, 0);
     const voiceBytes = await voiceUsed(env);
+    // Visitors: one per device per day (India time), last 14 days
+    const today = dayKey(), since = dayKey(Date.now() - 13 * 864e5), week = dayKey(Date.now() - 6 * 864e5);
+    const [daily, weekly] = await Promise.all([
+      env.DB.prepare('SELECT day, COUNT(*) AS visitors, COALESCE(SUM(signed_in), 0) AS signed_in FROM visits WHERE day >= ? GROUP BY day ORDER BY day').bind(since).all(),
+      env.DB.prepare('SELECT COUNT(DISTINCT vid) AS n FROM visits WHERE day >= ?').bind(week).first(),
+    ]);
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = dayKey(Date.now() - i * 864e5);
+      const r = daily.results.find(x => x.day === d);
+      days.push({ day: d, visitors: r ? r.visitors : 0, signedIn: r ? r.signed_in : 0 });
+    }
+    const visits = { today: days[13].visitors, yesterday: days[12].visitors, week: weekly.n, days, todayKey: today };
     return json({
+      visits,
       voice: { month: monthKey(), bytes: voiceBytes, cap: VOICE_CAP_BYTES, relay: !!(env.TURN_KEY_ID && env.TURN_KEY_API_TOKEN) },
       totals: { users: counts.total, guests: counts.guests, accounts: counts.total - counts.guests, newWeek: counts.new_week,
         plays: playsRow.plays, gameMs: playsRow.ms, playMs, activeMs: counts.active_ms },
@@ -353,6 +367,16 @@ async function handleApi(req, env, url) {
 
   const session = await currentSession(req, env);
   const user = session && session.user;
+
+  // Daily visitors (admin panel): the app sends its device id once a day. No IP or name is kept.
+  if (path === '/api/visit' && req.method === 'POST') {
+    const { vid = '' } = await readBody(req);
+    if (!/^[0-9a-f-]{36}$/.test(String(vid))) return json({ error: 'Bad visitor id.' }, 400);
+    await env.DB.prepare(`INSERT INTO visits (day, vid, first_at, signed_in) VALUES (?, ?, ?, ?)
+                          ON CONFLICT(day, vid) DO UPDATE SET signed_in = MAX(signed_in, excluded.signed_in)`)
+      .bind(dayKey(), String(vid), Date.now(), user ? 1 : 0).run();
+    return json({ ok: true });
+  }
 
   if (path === '/api/me') {
     if (!user) return json({ error: 'Not signed in.' }, 401);

@@ -1,5 +1,21 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-11-17 Admin: daily visitors tile + 14-day chart — DEPLOYED (version fc2e7d37)
+- New D1 table `visits (day, vid, first_at, signed_in)`, PK (day, vid): migrations/0006_visits.sql (CREATE IF NOT
+  EXISTS, run on remote via `npm run db:visits:remote`), same block appended to schema.sql.
+- App (src/App.jsx): random device id in localStorage `pr_vid`; POST /api/visit once per day per device, again if it
+  signs in later that day (`pr_visit` = "day:signedIn"). Not in the demo build; private mode = not counted.
+- Worker: POST /api/visit (works signed out; vid must be a UUID; upsert keeps signed_in = max). Admin overview
+  returns `visits {today, yesterday, week (distinct devices in 7 days), days[14] {day, visitors, signedIn}}`.
+  Days are India time (shared/xp.js dayKey). No IP or name stored.
+- Admin.jsx: first KPI tile "Visitors today" (note: yesterday · this week) + "Daily visitors" card (bars, last 14
+  days, signed-in count). KPI grid: 2 cols phone, 3 at 760px, 6 at 1100px.
+- Checked: npm test, test:ui (no errors), build; local dev with a local-only admin session (removed after):
+  2 visitors + reload not double counted, admin phone + desktop screenshots, no page errors. Live: /api/visit 200,
+  1 row for 2026-11-17 (my check). Counting started 2026-11-17, so earlier days show 0.
+- Limits: a device = a browser (same person on phone + laptop = 2); clearing storage = new device; anyone could
+  POST fake ids (low stakes, no auth by design).
+
 ## 2026-11-17 Rooms on the WebSocket Hibernation API — DEPLOYED 2026-11-17 (version 9edff473)
 - worker/room.js: `state.acceptWebSocket` + webSocketMessage/Close/Error; each socket's player in its attachment
   ({uid}), connections from `state.getWebSockets()` (no in-memory Map). Close handler replies itself (compat date

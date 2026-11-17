@@ -18,6 +18,8 @@
     "db:voice:remote": "wrangler d1 execute playroom-db --remote --file=migrations/0004_voice.sql",
     "db:xp:local": "wrangler d1 execute playroom-db --local --file=migrations/0005_xp.sql",
     "db:xp:remote": "wrangler d1 execute playroom-db --remote --file=migrations/0005_xp.sql",
+    "db:visits:local": "wrangler d1 execute playroom-db --local --file=migrations/0006_visits.sql",
+    "db:visits:remote": "wrangler d1 execute playroom-db --remote --file=migrations/0006_visits.sql",
     "words": "node scripts/build-words.js",
     "share": "npx cloudflared tunnel --url http://localhost:5173",
     "test": "node test/games.test.js",

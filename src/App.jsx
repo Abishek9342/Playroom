@@ -10,7 +10,7 @@ import { PassPlay } from './screens/PassPlay.jsx';
 import { Admin } from './screens/Admin.jsx';
 import { Daily } from './screens/Daily.jsx';
 import { LevelUp } from './components/LevelUp.jsx';
-import { levelInfo } from '../shared/xp.js';
+import { levelInfo, dayKey } from '../shared/xp.js';
 import { Toaster } from './components/Toaster.jsx';
 import { Confirmer } from './components/Confirmer.jsx';
 import { InstallButton } from './components/InstallButton.jsx';
@@ -96,6 +96,22 @@ export default function App() {
     const t = setInterval(() => { if (!document.hidden) api('/api/ping', {}).catch(() => {}); }, 60000);
     return () => clearInterval(t);
   }, [user && user.id]);
+  // daily visitors (admin stats): once a day per device, again if it signs in later that day
+  useEffect(() => {
+    if (DEMO || user === undefined) return;
+    const mark = `${dayKey()}:${user ? 1 : 0}`;
+    try {
+      let vid = localStorage.getItem('pr_vid');
+      if (!vid) {
+        vid = crypto.randomUUID ? crypto.randomUUID()
+          : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c => (c ^ (Math.random() * 16) >> (c / 4)).toString(16));
+        localStorage.setItem('pr_vid', vid);
+      }
+      const sent = localStorage.getItem('pr_visit') || '';
+      if (sent === mark || sent === `${dayKey()}:1`) return;
+      api('/api/visit', { vid }).then(() => localStorage.setItem('pr_visit', mark)).catch(() => {});
+    } catch {} // storage blocked (private mode): just not counted
+  }, [user && user.id, user === null]);
   useEffect(() => {
     if (DEMO) return;
     api('/api/me').then(u => { remember(u); setUser(u); })
