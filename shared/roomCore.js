@@ -280,6 +280,25 @@ export class RoomCore {
 
   log(text) { this.events.push({ t: Date.now(), text }); if (this.events.length > 30) this.events.shift(); }
 
+  // Saved state for a room that is NOT mid-game (lobby or results), so the Durable Object can
+  // hibernate and come back. A running game is never saved: the room stays awake while it plays.
+  // Results keep each player's final view of the board instead of the game object.
+  snapshot() {
+    if (this.status === 'playing') return null;
+    const views = this.status === 'over' && this.game
+      ? Object.fromEntries(this.players.map(p => [p.id, this.game.view(p.id)])) : null;
+    return {
+      status: this.status, players: this.players.map(p => ({ ...p })), result: this.result, match: this.match,
+      declined: this.declined || null, events: this.events, startedAt: this.startedAt || null, views,
+    };
+  }
+
+  restore(s) {
+    Object.assign(this, { status: s.status, players: s.players, result: s.result, match: s.match,
+      declined: s.declined, events: s.events, startedAt: s.startedAt || undefined });
+    this.game = s.views ? { view: uid => s.views[uid] ?? null, onEliminated() {}, handle: () => 'The game is over.' } : null;
+  }
+
   view(uid) {
     return {
       type: 'state', you: uid, token: this.cfg.token, game: this.cfg.game, size: this.cfg.size, options: this.cfg.options,

@@ -1,5 +1,22 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-11-17 Rooms on the WebSocket Hibernation API — NOT DEPLOYED (deploy blocked, waiting for the owner's OK)
+- worker/room.js: `state.acceptWebSocket` + webSocketMessage/Close/Error; each socket's player in its attachment
+  ({uid}), connections from `state.getWebSockets()` (no in-memory Map). Close handler replies itself (compat date
+  2025-09-01 < 2026-04-07).
+- Memory is wiped on hibernation, so RoomCore got `snapshot()`/`restore()`: lobby and results are saved to storage
+  key 'snap' on every change and restored in the constructor. Results keep each player's final `game.view(uid)`
+  (game replaced by a frozen stub; moves refused, rematch starts a real game). A running game is never saved
+  ('snap' deleted at start) and holds a 30 s keep-awake interval, so it never hibernates mid-game (Patches has no
+  turn timer of its own).
+- Effect: idle lobbies (up to 3 h TTL) and results screens (15 min) no longer use the free plan's 13,000 GB-s/day.
+- Checked: npm test (new "hibernation ok": lobby restore keeps seats and doesn't auto-start, game never saved,
+  results view identical after restore, rematch after restore), e2e + imposter-e2e + xp-e2e against local dev
+  (BASE=http://localhost:5174; port 5173 was taken by another app), real two-browser host+guest run: invite,
+  play, round 2, guest leaves, host VICTORY + Rematch, no page errors. Real eviction can't be forced locally.
+- Pre-existing test bug: test/browser/two-players.mjs OUT uses URL.pathname (breaks on Windows: "c:\c:\...").
+- OPEN: `npm run deploy` on the owner's OK, then push (commit is local only so GitHub keeps matching live).
+
 ## 2026-11-17 Pre-LinkedIn checks: committed + pushed, free-plan usage, live phone test
 - Committed all work since bb3b5a8 as a5062f1 and pushed to main (repo is public). Local build bundle
   index-B3G0WnW5.js = live bundle, so GitHub matches production (version 5b9360bf).

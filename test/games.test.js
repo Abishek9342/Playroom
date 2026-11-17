@@ -640,3 +640,34 @@ for (let t = 0; t < 2000; t++) {
   }
   console.log('imposter words ok');
 }
+
+// Hibernation (2026-11-17): a lobby or results screen survives the room being evicted from memory
+{
+  const restored = (core, snap) => { const r = new RoomCore(core.cfg); r.restore(structuredClone(snap)); return r; };
+  // lobby: seats come back, no game is started by the restore itself
+  const lobby = new RoomCore({ token: 'H', game: 'xo', size: 2, options: {} });
+  lobby.join('a', 'Ann');
+  const l2 = restored(lobby, lobby.snapshot());
+  assert.equal(l2.status, 'waiting');
+  assert.deepEqual(l2.players.map(p => p.id), ['a']);
+  assert.equal(l2.join('b', 'Bob'), null);  // second player joins after the wake: game starts as normal
+  assert.equal(l2.status, 'playing');
+  l2.stopTimers();
+  // a running game is never saved
+  assert.equal(l2.snapshot(), null);
+  // results: same final view per player, rematch still works, moves refused
+  const done = new RoomCore({ token: 'R', game: 'xo', size: 2, options: { bestOf: 1 } });
+  done.join('a', 'Ann'); done.join('b', 'Bob');
+  done.finish('a', 'Ann won');
+  const snap = done.snapshot();
+  const r2 = restored(done, snap);
+  assert.equal(r2.status, 'over');
+  assert.deepEqual(r2.view('b').g, done.view('b').g);
+  assert.deepEqual(r2.view('a').result, done.view('a').result);
+  assert.equal(r2.move('a', { type: 'place', i: 0 }), 'The game isn’t running.');
+  r2.rematch('a'); r2.rematch('b');
+  assert.equal(r2.status, 'playing');
+  assert.equal(r2.match, 1);
+  r2.stopTimers();
+  console.log('hibernation ok');
+}

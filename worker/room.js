@@ -4,18 +4,28 @@ import { xpForGame, nextStreak, dayKey } from '../shared/xp.js';
 
 const ROOM_TTL_MS = 3 * 3600e3;   // unused rooms are wiped after 3 hours
 const AFTER_GAME_MS = 15 * 60e3;  // finished rooms are wiped after 15 minutes
+const AWAKE_MS = 30e3;            // a running game keeps a timer so the room never hibernates mid-game
 
 // One instance per invite token: holds every player's WebSocket and is
 // the referee for that game.
+//
+// WebSocket Hibernation API (2026-11-17): an idle lobby or results screen costs nothing, because the
+// object is evicted from memory while the sockets stay open. Cloudflare bills a room for the whole time
+// a standard (accept()) socket is open, so before this an idle lobby used up the free plan's daily time.
+// Memory is wiped on hibernation, so lobby/results state is saved after every change ('snap') and
+// restored when the room wakes. Each socket carries its player in its attachment ({ uid }).
 export class GameRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.conns = new Map(); // WebSocket -> userId
     this.core = null;
+    this.awake = null;
     state.blockConcurrencyWhile(async () => {
       const cfg = await state.storage.get('cfg');
-      if (cfg) await this.boot(cfg);
+      if (!cfg) return;
+      await this.boot(cfg);
+      const snap = await state.storage.get('snap');
+      if (snap) this.core.restore(snap);
     });
   }
 
@@ -28,13 +38,23 @@ export class GameRoom {
     }
     this.core = new RoomCore(cfg, {
       isWord,
-      onChange: () => this.broadcast(),
+      onChange: () => { this.save(); this.broadcast(); },
       onFinish: summary => {
         this.state.storage.setAlarm(Date.now() + AFTER_GAME_MS).catch(() => {});
         this.state.waitUntil ? this.state.waitUntil(this.record(summary)) : this.record(summary);
       },
       onRestart: () => this.state.storage.setAlarm(Date.now() + ROOM_TTL_MS).catch(() => {}),
     });
+  }
+
+  // Lobby/results: save them so a hibernated room comes back as it was. Playing: drop the save (a
+  // stale lobby must not come back after an eviction mid-game) and hold a timer so it stays awake.
+  save() {
+    const snap = this.core.snapshot();
+    if (snap) this.state.storage.put('snap', snap).catch(e => console.error('snap', e));
+    else this.state.storage.delete('snap').catch(() => {});
+    if (this.core.status === 'playing' && !this.awake) this.awake = setInterval(() => {}, AWAKE_MS);
+    if (this.core.status !== 'playing' && this.awake) { clearInterval(this.awake); this.awake = null; }
   }
 
   // One row per finished game, one per player in it (playtime, moves, won). Stats only, so a
@@ -61,6 +81,11 @@ export class GameRoom {
     } catch (e) { console.error('stats', e); }
   }
 
+  // [socket, userId] for every open connection (survives hibernation, unlike a Map in memory).
+  conns() {
+    return this.state.getWebSockets().map(ws => [ws, (ws.deserializeAttachment() || {}).uid]).filter(([, uid]) => uid);
+  }
+
   async fetch(req) {
     const url = new URL(req.url);
     const uid = req.headers.get('x-user-id');
@@ -74,6 +99,7 @@ export class GameRoom {
       await this.boot(cfg);
       await this.state.storage.put('cfg', cfg);
       await this.state.storage.setAlarm(Date.now() + ROOM_TTL_MS);
+      this.save();
       return new Response('created', { status: 201 });
     }
 
@@ -88,7 +114,7 @@ export class GameRoom {
 
     if (url.pathname === '/ws') {
       const [client, server] = Object.values(new WebSocketPair());
-      server.accept();
+      this.state.acceptWebSocket(server);
       this.attach(server, uid, uname, guest);
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -100,25 +126,21 @@ export class GameRoom {
       try { ws.send(JSON.stringify({ type: 'error', fatal: true, message })); ws.close(4000, 'rejected'); } catch {}
     };
     if (!this.core) return fail('This room doesn’t exist or has expired.');
-    this.conns.set(ws, uid);
-    ws.addEventListener('message', e => this.onMessage(ws, e.data));
-    const closed = () => this.onClose(ws);
-    ws.addEventListener('close', closed);
-    ws.addEventListener('error', closed);
     // The host's seat is reserved: they must be the first to sit down.
     if (this.core.players.length === 0 && this.cfg.host && uid !== this.cfg.host && this.core.status === 'waiting') {
-      this.conns.delete(ws);
       return fail('The host hasn’t opened this room yet. Try again in a moment.');
     }
+    ws.serializeAttachment({ uid });
     const err = this.core.join(uid, uname, { guest });
-    if (err) { this.conns.delete(ws); return fail(err); }
+    if (err) { ws.serializeAttachment(null); return fail(err); }
   }
 
-  onMessage(ws, raw) {
-    const uid = this.conns.get(ws);
+  webSocketMessage(ws, raw) {
+    const uid = (ws.deserializeAttachment() || {}).uid;
+    const c = this.core;
+    if (!uid || !c) return;
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
-    const c = this.core;
     switch (msg.type) {
       case 'hidden': c.away(uid, 'switched tabs'); break;
       case 'visible': c.back(uid); break;
@@ -140,7 +162,7 @@ export class GameRoom {
         if (typeof msg.to !== 'string' || !c.find(msg.to) || !c.find(uid)) break;
         const out = JSON.stringify({ type: 'rtc', from: uid, data: msg.data });
         if (out.length > 20000) break;
-        for (const [sock, id] of this.conns) if (id === msg.to) { try { sock.send(out); } catch {} }
+        for (const [sock, id] of this.conns()) if (id === msg.to) { try { sock.send(out); } catch {} }
         break;
       }
       case 'move': {
@@ -151,24 +173,31 @@ export class GameRoom {
     }
   }
 
+  webSocketClose(ws, code) {
+    try { ws.close(code === 1005 ? 1000 : code, 'bye'); } catch {} // compatibility date < 2026-04-07: reply ourselves
+    this.onClose(ws);
+  }
+
+  webSocketError(ws) { this.onClose(ws); }
+
   onClose(ws) {
-    if (!this.conns.has(ws)) return;
-    const uid = this.conns.get(ws);
-    this.conns.delete(ws);
-    if ([...this.conns.values()].includes(uid)) return; // still open in another tab
+    const uid = (ws.deserializeAttachment() || {}).uid;
+    if (!uid) return;
+    try { ws.serializeAttachment(null); } catch {} // close and error can both arrive; handle it once
+    if (this.conns().some(([s, id]) => s !== ws && id === uid)) return; // still open in another tab
     this.core && this.core.disconnect(uid);
   }
 
   broadcast() {
     if (!this.core) return;
-    for (const [ws, uid] of this.conns) {
+    for (const [ws, uid] of this.conns()) {
       try { ws.send(JSON.stringify(this.core.view(uid))); } catch {}
     }
   }
 
   async alarm() {
-    for (const ws of this.conns.keys()) { try { ws.close(1000, 'room closed'); } catch {} }
-    this.conns.clear();
+    for (const ws of this.state.getWebSockets()) { try { ws.close(1000, 'room closed'); } catch {} }
+    if (this.awake) { clearInterval(this.awake); this.awake = null; }
     if (this.core) this.core.stopTimers();
     this.core = null;
     await this.state.storage.deleteAll();
