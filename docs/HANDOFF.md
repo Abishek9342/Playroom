@@ -1,6 +1,6 @@
 # Handoff: where things stand (Oct 30, 2026)
 
-## 2026-11-17 Rooms on the WebSocket Hibernation API — NOT DEPLOYED (deploy blocked, waiting for the owner's OK)
+## 2026-11-17 Rooms on the WebSocket Hibernation API — DEPLOYED 2026-11-17 (version 9edff473)
 - worker/room.js: `state.acceptWebSocket` + webSocketMessage/Close/Error; each socket's player in its attachment
   ({uid}), connections from `state.getWebSockets()` (no in-memory Map). Close handler replies itself (compat date
   2025-09-01 < 2026-04-07).
@@ -15,7 +15,9 @@
   (BASE=http://localhost:5174; port 5173 was taken by another app), real two-browser host+guest run: invite,
   play, round 2, guest leaves, host VICTORY + Rematch, no page errors. Real eviction can't be forced locally.
 - Pre-existing test bug: test/browser/two-players.mjs OUT uses URL.pathname (breaks on Windows: "c:\c:\...").
-- OPEN: `npm run deploy` on the owner's OK, then push (commit is local only so GitHub keeps matching live).
+- Deployed on the owner's OK. Live check: practice XO loads, no page errors; a guest ("Deploy check", one
+  throwaway guest row in prod D1) opening a WebSocket to a made-up room got the room's own "doesn't exist"
+  reply, so the hibernation code path is live. OPEN: owner's two-phone online round; real sleep/wake on prod.
 
 ## 2026-11-17 Pre-LinkedIn checks: committed + pushed, free-plan usage, live phone test
 - Committed all work since bb3b5a8 as a5062f1 and pushed to main (repo is public). Local build bundle
