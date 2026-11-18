@@ -1,5 +1,11 @@
 # Handoff: where things stand (Oct 30, 2026)
 
+## 2026-11-18 Instagram story frames (no app change)
+- 4 frames 1080x1920 in screenshots/instagram-stories/ (git-ignored): hook (Imposter card), 5 games (practice list),
+  no download / join with a code (Word Chain), poll "which one first?" (XO win + game chips + URL). Made from live
+  phone screenshots (390x844 @3x) placed in an HTML layout in the app's theme, rendered with Playwright. Top 250 px
+  and bottom area kept clear for Instagram's bar, link sticker and poll sticker. Owner adds the stickers.
+
 ## 2026-11-17 Admin: daily visitors tile + 14-day chart — DEPLOYED (version fc2e7d37)
 - New D1 table `visits (day, vid, first_at, signed_in)`, PK (day, vid): migrations/0006_visits.sql (CREATE IF NOT
   EXISTS, run on remote via `npm run db:visits:remote`), same block appended to schema.sql.
